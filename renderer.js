@@ -78,8 +78,13 @@ async function loadPlaylistSongs(songs) {
 }
 
 function clearPlayingStyle() {
-  const rows = playlistDiv.querySelectorAll('.playlist-row');
-  rows.forEach(r => r.classList.remove('playing'));
+  // Seleccionamos todas las filas del tbody que tengan la clase "playing"
+  const filasPlaying = document.querySelectorAll('#playlist tbody tr.playing');
+
+  // Eliminamos cada una de esas filas
+  filasPlaying.forEach(fila => {
+    fila.classList.remove('playing');
+  });
 }
 
 function updatePlaylistUI() {

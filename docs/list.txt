@@ -36,7 +36,8 @@ Other Tools to unify EtudePlayer (Etude Studio):
 - ✅ Equalizer audio
 - ✅ Canciones del nodo xmas ordenadas por nombre de archivo y no por rutas, tras haber obtenido todas las canciones de las carpetas xmas
 - ✅ incluir tambien archivos mp4 (videos) y poder verlos
-- ⭕ Mejorar la playlist // quitar estilo de playing tras stop y stop after current
+- ⭕ Mejorar la playlist
+- Mostrar una notificacion tooltip en el lado inferior derecho con progressbar para ver las operaciones de indexeado y actualizacion de carpetas y playlist, y mostrar tambien errores de la consola
 - Guardar exploracion de carpetas de archivos en cache para acceder más rapido y detectar cambios tras iniciar y cuando haya cambios en tiempo real
 
 
