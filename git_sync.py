@@ -7,7 +7,7 @@ ruta_proyecto = r"E:\__Lab\EtudePlayer"  # Cambia esto a la ruta de tu proyecto
 # -------------------------------------------------------
 # Mensaje del commit (cambiar antes de ejecutar)
 
-mensaje_commit = "Sincronizar con github 2025-09-17"  # Cambia este mensaje según lo que necesites
+mensaje_commit = "agregado de documentacion 2025-09-17 16:43"  # Cambia este mensaje según lo que necesites
 
 # -------------------------------------------------------
 
