@@ -1,0 +1,24 @@
+.playlist {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.playlist th, .playlist td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #ccc;
+  text-align: left;
+}
+
+.playlist tr {
+  cursor: pointer;
+}
+
+.playlist tr.selected {
+  background-color: #007acc;
+  color: white;
+}
+
+.playlist tr.playing {
+  font-weight: bold;         /* negrita para la canción que se reproduce */
+  background-color: #99ccff; /* fondo azul más intenso */
+}

@@ -1,0 +1,16 @@
+cosas que chatgpt quiere arreglar:
+
+nodeIntegration: true y contextIsolation: false
+- Está bien para desarrollo, pero es inseguro para producción. Podrías usar un preload.js seguro y mantener contextIsolation: true.
+
+getFolderNodes recursivo
+- Funciona bien, pero si hay muchas carpetas puede bloquear el hilo principal (fs.readdirSync es síncrono).
+- Se podría hacer versión asíncrona con fs.promises para no bloquear la UI.
+
+Error handling
+- Solo se captura en 'get-songs'. Podrías envolver también 'get-playlists' y 'get-xmas-songs' en try/catch para seguridad.
+- Por lo tanto hay que mejorar preload.js y evitar errores por clics múltiples
+- cambiar los invoke a 'await window.electronAPI.'
+- usar ya el preload en el main. usar un preload.js seguro y tener contextIsolation: true.
+
+veamos si todo esta listo

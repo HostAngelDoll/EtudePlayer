@@ -1,0 +1,16 @@
+{
+  "name": "etudeplayer",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "keywords": [],
+  "author": "HostAngelDoll",
+  "license": "ISC",
+  "dependencies": {
+    "chokidar": "^4.0.3",
+    "wavesurfer.js": "^7.10.1"
+  }
+}

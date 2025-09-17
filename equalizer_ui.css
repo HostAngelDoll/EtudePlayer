@@ -1,0 +1,24 @@
+#eqContainer {
+  display: flex;
+  align-items: flex-end; /* que las etiquetas queden arriba de los sliders */
+  gap: 6px; /* espacio entre sliders */
+}
+
+.eqBand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.eqLabel {
+  font-size: 0.8em;
+  margin-bottom: 4px;
+  text-align: center;
+}
+
+#eqContainer input[type="range"] {
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 30px; /* ancho del slider */
+  height: 150px; /* alto del slider */
+}

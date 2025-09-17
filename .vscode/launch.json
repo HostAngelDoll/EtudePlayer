@@ -1,0 +1,16 @@
+{
+  "version": "0.2.0",
+  //origin: https://www.electronjs.org/docs/latest/tutorial/debugging-vscode
+  // más tarde veriamos sobre los renders
+  "configurations": [
+    {
+      "name": "Debug Main Process",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "runtimeExecutable": "electron",
+      "args" : ["."],
+      "outputCapture": "std"
+    }
+  ]
+}

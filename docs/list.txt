@@ -1,0 +1,121 @@
+List: 
+
+- Global Keyboard shortcuts
+- Volume control and porcentague Volume
+- buttons Volume
+- Mute button
+- Waveform Seekbar
+- Duration / Current Dur / Left Dur
+- Pitch audio control
+- Move file to folder to invoke context menu
+- Select multiple items in playlist
+- drag element in the playlist
+- button copy filename
+- button to move to recicler bin
+- status bar
+- implement video view
+- folders list as activity bar as vscode
+
+
+Other Tools to unify EtudePlayer (Etude Studio):
+- HandImageENJS
+- Music Searcher (for player)
+
+
+----------------------------------------------------------------------------------------------
+
+- ✅ Volume slider control and porcentaje volume
+- ✅ Volume and mute buttons
+- ✅ Waveform Seekbar
+- ✅ Casilla: Stop after current song
+- ✅ Labels: Total Duration / Current Dur / Left Dur 
+- ✅ Button for copy filename without extencion for a current song
+- ✅ Pitch audio control
+- ✅ Status bar for playback state (playing/pause) in stop case then show name player
+- ✅ loading folder in background process for avoid freeze program
+- ✅ Equalizer audio
+- ✅ Canciones del nodo xmas ordenadas por nombre de archivo y no por rutas, tras haber obtenido todas las canciones de las carpetas xmas
+- ✅ incluir tambien archivos mp4 (videos) y poder verlos
+- ⭕ Mejorar la playlist // quitar estilo de playing tras stop y stop after current
+- Guardar exploracion de carpetas de archivos en cache para acceder más rapido y detectar cambios tras iniciar y cuando haya cambios en tiempo real
+
+
+Mejoras en la playlist:
+  - funcione como un listbox, poder selecionar uno o varios elementos
+  - debe poder tener 1 o más columnas
+  - habra 2 columnas: "nombre" y "duracion"
+  - al darle click a un elemento se seleciona
+  - doble click para reproducirlo y seleccionarlo
+  - estilo de seleccion de uno o m´´as
+  - click derecho para ver un menu conceptual (vacio por ahora, listo para agregar cosas)
+
+
+Eventos de la playlist:
+  - al haber movido o haber quitado un elemento se actualiza la playlist
+
+Menu conceptual para un solo elemento:
+  - mover a carpeta 
+  - cambiar nombre
+  - copiar nombre del archivo
+  - mover a papelera
+
+Menu conceptual para varios elementos seleccionados:
+  - mover a carpeta
+  - copiar nombres de los archivos
+  - mover a papelera
+
+Funcionamiento de la Dialog para mover archivos:
+  - habra un elemento primero y sera "./" para ir a carpeta arriba
+  - otro llamado "/+" para agregar carpeta nueva y saldra un dialog para el nombre
+  - debajo de la lista estan dos botones
+    - mover
+    - cancelar
+  - primero saldran una lista de las carpetas de año
+  - elegir una carpeta de año
+  - estaran las carpetas como:
+    - XX. music.main
+    - XX. music.registry.album.package
+    - XX. music.registry.base
+    - XX. music.theme
+    - XX. music.xmas
+  - (donde XX. es la id la cual se obtiene a traves de la carpeta de año como [ year - 2003 = id en dos digitos ] )
+  - las carpetas mensionadas solo apareceran en la lista para elegirlas y se pueden entrar en ellas.
+  - las siguientes carpetas dodne no pueden crearse nuevas carpetas dentro de ellas son las que terminan con ".main", ".registry.base", ".xmas"
+    
+Ubicacion de la papelera:
+  - la ruta es: "E:/_Exclude/l_reallydeleted"
+
+posterior:
+  - listbox de dos columnas: "nombre de archivo" y "duracion"
+
+Extention Feature (Ending jobs)
+- Remember playlist, volume state, window state, song before close
+- Global Keyboard shortcuts
+- set css styles in the UI.css
+
+
+------------------------------------------------------------------------------------------------
+
+CONSEJOS ADICIONALES:
+- 🟥 Usa Web Audio API para el control preciso de audio (pitch, volumen, mute, waveform).
+- 🟥 Considera Howler.js o Tone.js si buscas facilitar el trabajo con audio.
+- Usa electron-context-menu o similar para facilitar la implementación de menús contextuales.
+- Divide tu app en módulos: AudioManager, UIManager, FileManager, etc.
+
+
+global keyboard shortcuts:
+- Num1 back 10 seconds playback
+- Num2 next song
+- Num3 ahead 10 seconds playback
+- Num4 previous
+- Num5 play/pause
+- Num6 Activate/minimize window
+- Num7 volume down
+- Num8 random song in playlist
+- Num9 volume up
+
+comming soon:
+- propeties tags and thecnical in mp3's
+- file searcher
+
+-----------------------------------------------------------------------
