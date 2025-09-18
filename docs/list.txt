@@ -41,7 +41,7 @@ Other Tools to unify EtudePlayer (Etude Studio):
 - Guardar exploracion de carpetas de archivos en cache para acceder más rapido y detectar cambios tras iniciar y cuando haya cambios en tiempo real
 
 
-Mejoras en la playlist:
+⭕ Mejoras en la playlist:
   - funcione como un listbox, poder selecionar uno o varios elementos
   - debe poder tener 1 o más columnas
   - habra 2 columnas: "nombre" y "duracion"
@@ -50,9 +50,9 @@ Mejoras en la playlist:
   - estilo de seleccion de uno o m´´as
   - click derecho para ver un menu conceptual (vacio por ahora, listo para agregar cosas)
 
-
 Eventos de la playlist:
-  - al haber movido o haber quitado un elemento se actualiza la playlist
+  - al haber movido o haber quitado una cancion se actualiza la playlist
+  - o haber cambios en las carpetas de las canciones tanto agregado como movimientos y eliminacion
 
 Menu conceptual para un solo elemento:
   - mover a carpeta 
