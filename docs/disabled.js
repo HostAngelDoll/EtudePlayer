@@ -22,3 +22,15 @@
 //     wavesurfer = null;
 //   }
 // });
+
+// function updatePlaylistUI() { // Actualizar lista en la interfaz
+//   playlistDiv.innerHTML = '';
+//   playlist.forEach((song, index) => {
+//     const div = document.createElement('div');
+//     div.textContent = song.name || song; // si viene como objeto {name,path} o string
+//     div.style.cursor = 'pointer';
+//     if (index === currentSongIndex) div.style.fontWeight = 'bold';
+//     div.addEventListener('click', () => playSong(index));
+//     playlistDiv.appendChild(div);
+//   });
+// }

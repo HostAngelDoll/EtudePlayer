@@ -45,17 +45,7 @@ volumeLabel.textContent = `${volumeSlider.value}%`;
 // -----------------------------------------------------
 
 
-// function updatePlaylistUI() { // Actualizar lista en la interfaz
-//   playlistDiv.innerHTML = '';
-//   playlist.forEach((song, index) => {
-//     const div = document.createElement('div');
-//     div.textContent = song.name || song; // si viene como objeto {name,path} o string
-//     div.style.cursor = 'pointer';
-//     if (index === currentSongIndex) div.style.fontWeight = 'bold';
-//     div.addEventListener('click', () => playSong(index));
-//     playlistDiv.appendChild(div);
-//   });
-// }
+
 
 async function loadPlaylistSongs(songs) {
   // Crear objetos con name, path y duration
@@ -196,7 +186,7 @@ playPauseBtn.addEventListener('click', () => {
   if (wavesurfer.isPlaying()) {
     wavesurfer.pause();
   } else {
-    wavesurfer.play();
+    playSong();
   }
 });
 
@@ -215,8 +205,7 @@ copyBtn.addEventListener('click', () => {
   const currentSong = playlist[currentSongIndex];
   if (!currentSong) return;
 
-  // Extraer nombre sin extensión
-  const filename = currentSong.name.replace(/\.[^/.]+$/, "");
+  const filename = currentSong.name.replace(/\.[^/.]+$/, "");  // Extraer nombre sin extensión
 
   navigator.clipboard.writeText(filename).then(() => {
     console.log(`Copied: ${filename}`);
