@@ -188,6 +188,7 @@ playPauseBtn.addEventListener('click', () => {
     wavesurfer.pause();
   } else {
     wavesurfer.play();
+    document.title = getNameAndYear(songPath);
     updatePlaylistUI();
   }
 });

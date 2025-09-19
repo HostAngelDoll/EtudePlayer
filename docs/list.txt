@@ -41,7 +41,7 @@ Other Tools to unify EtudePlayer (Etude Studio):
 
 
 
-Mejoras en la playlist:
+⭕ Mejoras en la playlist:
   - funcione como un listbox, poder selecionar uno o varios elementos
   - debe poder tener 1 o más columnas
   - habra 2 columnas: "nombre" y "duracion"
@@ -52,7 +52,6 @@ Mejoras en la playlist:
 
 Cachear indexeado de carpetas y playlist.
   - Cachear la exploracion de carpetas de años y contenidos a igual que las playlist para no esperar a que todo cargue mientras se van detecando cambios en playlist y carpetas de años mientras se inicia el programa, esa operacion se usara tambien cuando se detecten cambios.
-  - 
 
 
 Integracion del menu contextual de electron a los elementos de la playlist
