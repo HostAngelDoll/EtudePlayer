@@ -47,7 +47,7 @@ Other Tools to unify EtudePlayer (Etude Studio):
   - habra 2 columnas: "nombre" y "duracion"
   - al darle click a un elemento se seleciona
   - doble click para reproducirlo y seleccionarlo
-  - estilo de seleccion de uno o m´´as
+  - estilo de seleccion de uno o más
   - click derecho para ver un menu conceptual (vacio por ahora, listo para agregar cosas)
 
 Eventos de la playlist:
