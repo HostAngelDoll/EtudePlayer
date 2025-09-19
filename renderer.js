@@ -37,6 +37,7 @@ let pitchValue = 1.0; // valor persistente
 let audioContext = null; // Definir bandas del ecualizador
 let eqFilters = [];
 let mediaNode = null;
+let songPath = null;
 volumeLabel.textContent = `${volumeSlider.value}%`;
 
 
@@ -153,7 +154,7 @@ function getNameAndYear(rawFileUrl) {
 
 function playSong(index) { // Reproducir canción por índice
   if (playlist.length === 0) return;
-  const songPath = playlist[index].path || playlist[index]; // ruta absoluta
+  songPath = playlist[index].path || playlist[index]; // ruta absoluta
   currentSongIndex = index;
 
   initWaveform(songPath);
@@ -186,7 +187,8 @@ playPauseBtn.addEventListener('click', () => {
   if (wavesurfer.isPlaying()) {
     wavesurfer.pause();
   } else {
-    playSong();
+    wavesurfer.play();
+    updatePlaylistUI();
   }
 });
 
@@ -529,6 +531,7 @@ function initWaveform(audioPath) {
     if (stopAfterCheckbox.checked) {
       stopAfterCheckbox.checked = false; // desmarcar automáticamente
       document.title = originalTitle;    // reset título
+      songPath = null
       clearPlayingStyle();
       return; // no reproducir siguiente
     }
@@ -538,6 +541,7 @@ function initWaveform(audioPath) {
       playSong(currentSongIndex);
     } else {
       document.title = originalTitle;
+      songPath = null
       statusBar.textContent = originalTitle;
       clearPlayingStyle();
     }

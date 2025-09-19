@@ -38,7 +38,7 @@ Other Tools to unify EtudePlayer (Etude Studio):
 - ✅ incluir tambien archivos mp4 (videos) y poder verlos
 - ⭕ Mejorar la playlist
 - Mostrar una notificacion tooltip en el lado inferior derecho con progressbar para ver las operaciones de indexeado y actualizacion de carpetas y playlist, y mostrar tambien errores de la consola
-- Guardar exploracion de carpetas de archivos en cache para acceder más rapido y detectar cambios tras iniciar y cuando haya cambios en tiempo real
+
 
 
 Mejoras en la playlist:
@@ -48,6 +48,12 @@ Mejoras en la playlist:
   - al darle click a un elemento se seleciona
   - doble click para reproducirlo y seleccionarlo
   - estilo de seleccion de uno o más
+
+
+Cachear indexeado de carpetas y playlist.
+  - Cachear la exploracion de carpetas de años y contenidos a igual que las playlist para no esperar a que todo cargue mientras se van detecando cambios en playlist y carpetas de años mientras se inicia el programa, esa operacion se usara tambien cuando se detecten cambios.
+  - 
+
 
 Integracion del menu contextual de electron a los elementos de la playlist
   - click derecho para ver un menu conceptual (vacio por ahora, listo para agregar cosas)
