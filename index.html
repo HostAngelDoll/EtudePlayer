@@ -3,15 +3,22 @@
 
 <head>
   <meta charset="UTF-8"> <!-- Obligatory -->
-  <!-- <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self';"> -->
   <link rel="stylesheet" href="ui.css">
   <link rel="stylesheet" href="equalizer_ui.css">
   <link rel="stylesheet" href="playlist_ui.css">
+  <link rel="stylesheet" href="progressbar.css">
   <script src="wavesurfer.min.js"></script>
 </head>
 
 <body>
   <h1>🎵 EtudePlayer</h1>
+
+  <div id="progressTooltip">
+    <div id="progressMessage">Indexando...</div>
+    <div id="progressBar">
+      <div id="progressFill"></div>
+    </div>
+  </div>
 
   <div id="controls">
     <button id="prevBtn">⏮️ Anterior</button>

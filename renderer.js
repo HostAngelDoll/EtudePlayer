@@ -38,6 +38,7 @@ let audioContext = null; // Definir bandas del ecualizador
 let eqFilters = [];
 let mediaNode = null;
 let songPath = null;
+let playlistCache = {};
 volumeLabel.textContent = `${volumeSlider.value}%`;
 
 
@@ -45,28 +46,149 @@ volumeLabel.textContent = `${volumeSlider.value}%`;
 // funciones de renderer
 // -----------------------------------------------------
 
+function vaciarPlaylistCache() { localStorage.removeItem('playlistCache'); }
+
+function deriveFolderFromPath(p) {
+  if (!p || typeof p !== 'string') return null;
+  const pos = Math.max(p.lastIndexOf('\\'), p.lastIndexOf('/'));
+  if (pos === -1) return null;
+  return p.substring(0, pos);
+}
+
+async function getAudioDurationSeconds(src) {
+  return new Promise((resolve) => {
+    try {
+      const a = document.createElement('audio');
+      a.preload = 'metadata';
+      a.src = src;
+      const onLoaded = () => {
+        const val = a.duration || 0;
+        cleanup();
+        resolve(val);
+      };
+      const onError = () => {
+        cleanup();
+        resolve(0);
+      };
+      function cleanup() {
+        a.removeEventListener('loadedmetadata', onLoaded);
+        a.removeEventListener('error', onError);
+        try { a.src = ''; } catch (e) {}
+      }
+      a.addEventListener('loadedmetadata', onLoaded, { once: true });
+      a.addEventListener('error', onError, { once: true });
+    } catch (e) {
+      resolve(0);
+    }
+  });
+}
 
 
+// songsArray: array de strings (paths) o array de objetos {name, path}
+// cacheKey: string identificador para cache (ej: folderPath o 'xmas-all')
+async function loadPlaylistFromArray(songsArray, cacheKey) {
+  if (!Array.isArray(songsArray)) return;
 
-async function loadPlaylistSongs(songs) {
-  // Crear objetos con name, path y duration
-  playlist = await Promise.all(songs.map(async f => {
-    const songPath = typeof f === 'string' ? f : f.path;
-    const audio = new Audio(songPath);
-    await new Promise(resolve => {
-      audio.addEventListener('loadedmetadata', resolve, { once: true });
-    });
-    const minutes = Math.floor(audio.duration / 60);
-    const seconds = Math.floor(audio.duration % 60).toString().padStart(2, '0');
-    return {
-      name: f.name || f.split('\\').pop(),
+  // generar cacheKey si no viene
+  if (!cacheKey) {
+    const first = songsArray[0];
+    const samplePath = (typeof first === 'string') ? first : (first && first.path);
+    cacheKey = deriveFolderFromPath(samplePath) || `playlist-${Date.now()}`;
+  }
+
+  // Ordenar el array por nombre de archivo
+  songsArray.sort((a, b) => {
+    const nameA = (typeof a === 'string') ? a.split(/[\\/]/).pop() : (a.name || a.path);
+    const nameB = (typeof b === 'string') ? b.split(/[\\/]/).pop() : (b.name || b.path);
+    return nameA.localeCompare(nameB);
+  });
+
+  // usar cache si existe y tiene contenido
+  if (playlistCache[cacheKey] && Array.isArray(playlistCache[cacheKey]) && playlistCache[cacheKey].length > 0) {
+    console.log('Usando cache para', cacheKey);
+    playlist = playlistCache[cacheKey];
+    updatePlaylistUI();
+    return;
+  }
+
+  // si no hay cache → calcular duraciones secuencialmente (para progress)
+  const total = songsArray.length;
+  const newPlaylist = [];
+
+  for (let i = 0; i < total; i++) {
+    const item = songsArray[i];
+    const songPath = (typeof item === 'string') ? item : (item.path || item.name);
+
+    // derivar nombre si no viene
+    let name = (typeof item === 'object' && item.name) 
+    ? item.name 
+    : (songPath ? songPath.split(/[\\/]/).pop() : `track-${i+1}`);
+
+    name = getNameAndYear_forArray(songPath);
+
+    if (!songPath) {
+      newPlaylist.push({ name, path: '', duration: '0:00' });
+      showProgressNotification(`Cargando ${i + 1} de ${total}`, (i + 1) / total);
+      continue;
+    }
+
+    const durSecs = await getAudioDurationSeconds(songPath); // puede tardar, lo esperamos
+    const mins = Math.floor(durSecs / 60);
+    const secs = Math.floor(durSecs % 60).toString().padStart(2, '0');
+
+    newPlaylist.push({
+      name,
       path: songPath,
-      duration: `${minutes}:${seconds}`
-    };
-  }));
+      duration: `${mins}:${secs}`
+    });
+
+    // update progress using tu función existente
+    showProgressNotification(`Cargando ${i + 1} de ${total}`, (i + 1) / total);
+  }
+
+  playlist = newPlaylist;
+
+  // Guardar en cache si hay contenido válido y cacheKey es string
+  if (playlist.length > 0 && typeof cacheKey === 'string') {
+    playlistCache[cacheKey] = playlist;
+    try {
+      localStorage.setItem('playlistCache', JSON.stringify(playlistCache));
+    } catch (err) {
+      console.warn('No se pudo guardar playlistCache en localStorage:', err);
+    }
+  }
 
   updatePlaylistUI();
+  showProgressNotification('Carga completa', 1); // esto ocultará después si tu func lo hace
 }
+
+
+// folderPath: string (ruta absoluta)
+async function loadPlaylistFromFolder(folderPath) {
+  if (!folderPath) return;
+  // crear cacheKey = folderPath (asegurar string)
+  const cacheKey = String(folderPath);
+
+  // pedir archivos al main (devuelve array de filenames)
+  const files = await window.electronAPI.getSongs(folderPath); // filenames (ej: ['01.mp3','02.mp4'])
+
+  // convertir a array de objetos con path completo
+  const songsArray = files.map(f => ({ name: f, path: `${folderPath}\\${f}` }));
+
+  // delegar a loadPlaylistFromArray con cacheKey claro
+  await loadPlaylistFromArray(songsArray, cacheKey);
+}
+
+
+window.addEventListener('beforeunload', () => {
+  try {
+    localStorage.setItem('playlistCache', JSON.stringify(playlistCache));
+    console.log('playlistCache guardado antes de cerrar');
+  } catch (e) {
+    console.warn('No se pudo guardar playlistCache al cerrar:', e);
+  }
+});
+
 
 function clearPlayingStyle() {
   // Seleccionamos todas las filas del tbody que tengan la clase "playing"
@@ -126,16 +248,7 @@ function updatePlaylistUI() {
       playSong(index);
       // tbody.querySelectorAll('tr').forEach(r => r.classList.remove('playing'));      
       tr.classList.add('playing');
-      // al oprimir stop no deberia marcar
     });
-
-    // Click derecho
-    // tr.addEventListener('contextmenu', (e) => {
-    //   e.preventDefault();
-    //   tbody.querySelectorAll('tr').forEach(r => r.classList.remove('selected'));
-    //   tr.classList.add('selected');
-    //   console.log("Mostrar menú contextual para:", song.name);
-    // });
 
     tr.addEventListener("contextmenu", (e) => {
       e.preventDefault();
@@ -160,7 +273,7 @@ function updatePlaylistUI() {
 
     tbody.appendChild(tr);
   });
-  
+
 }
 
 window.electronAPI.onContextPlaySelected(() => {
@@ -174,12 +287,48 @@ window.electronAPI.onContextPlaySelected(() => {
   }
 });
 
+// ----------------------------------------------------------------------
+// playback state
+// ----------------------------------------------------------------------
+
 function getNameAndYear(rawFileUrl) {
   let path = rawFileUrl.replace(/^file:\/+/, ''); // 1. Eliminar el prefijo "file://"
   path = decodeURIComponent(path); // 2. Decodificar caracteres codificados (como %20 -> espacio)
   const pathSubstring = path.substring(13, 17); // 3. Extraer subcadena (índices 13 a 16 inclusive = JS substring(13,17))
   let filename = path.split(/[\\/]/).pop(); // 4. Obtener nombre de archivo
   if (filename.includes('.')) { filename = filename.substring(0, filename.lastIndexOf('.')); }
+  return `${pathSubstring}. ${filename}`;
+}
+
+function getNameAndYear_forArray(rawFileUrl) {
+  let path = rawFileUrl;
+
+  // Si la ruta empieza con "file://", eliminar ese prefijo
+  if (path.startsWith('file://')) {
+    path = path.replace(/^file:\/+/, '');
+  }
+
+  // Decodificar posibles caracteres codificados
+  path = decodeURIComponent(path);
+
+  // Extraer nombre del archivo (lo que viene después del último '/' o '\')
+  let filename = path.split(/[\\/]/).pop();
+
+  // Si el nombre tiene extensión, eliminarla
+  if (filename.includes('.')) {
+    filename = filename.substring(0, filename.lastIndexOf('.'));
+  }
+
+  // Extraer año: substring desde posición 13 a 16 (índices 13 a 16 inclusive)
+  // Para evitar errores, verificamos que la cadena sea suficientemente larga
+  let pathSubstring = '';
+  if (path.length >= 17) {
+    pathSubstring = path.substring(13, 17);
+  } else {
+    // Si la ruta es muy corta, devolvemos un valor por defecto o vacío
+    pathSubstring = '????';
+  }
+
   return `${pathSubstring}. ${filename}`;
 }
 
@@ -259,6 +408,17 @@ function setActiveFolder(el) {
 
 // Cargar árbol y manejar clicks en nodos
 window.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const savedCache = localStorage.getItem('playlistCache');
+    if (savedCache) {
+      playlistCache = JSON.parse(savedCache) || {};
+      console.log('playlistCache restaurado. Claves:', Object.keys(playlistCache));
+    }
+  } catch (err) {
+    console.warn('No se pudo restaurar playlistCache:', err);
+    playlistCache = {};
+  }
+
   const data = await window.electronAPI.getPlaylists();
   const treeContainer = document.getElementById('tree');
 
@@ -295,14 +455,8 @@ window.addEventListener('DOMContentLoaded', async () => {
       }
 
       // Si es carpeta de música, cargar canciones bajo demanda
-      //// if (node.type === 'folder' && !node.loadedSongs && node.path)
       if (node.type === 'folder' && node.path) {
-        const songs = await window.electronAPI.getSongs(node.path);
-
-        // playlist = songs.map(f => ({ name: f, path: `${node.path}\\${f}` }));
-        // updatePlaylistUI();
-
-        await loadPlaylistSongs(songs.map(f => ({ name: f, path: `${node.path}\\${f}` })));
+        await loadPlaylistFromFolder(node.path);
 
         node.loadedSongs = true; // marca que ya cargamos
         if (autoPlay && playlist.length > 0) playSong(0); // solo si el flag autoPlay está activo
@@ -314,7 +468,6 @@ window.addEventListener('DOMContentLoaded', async () => {
 
         li.addEventListener('click', async (e) => {
           e.stopPropagation();
-          // const songs = await ipc|Renderer.invoke('get-xmas-songs', node.path);
           const songs = await window.electronAPI.getXmasSongs(node.path);
 
           playlist = songs.map(f => ({
@@ -322,10 +475,7 @@ window.addEventListener('DOMContentLoaded', async () => {
             path: f // ruta completa
           }));
 
-          // playlist.sort((a, b) => a.name.localeCompare(b.name, 'es', { numeric: true }));
-          // updatePlaylistUI();
-
-          await loadPlaylistSongs(songs.map(f => ({ name: f, path: `${node.path}\\${f}` })));
+          await loadPlaylistFromArray(songs, 'xmas-all'); // cacheKey claro 'xmas-all'
 
           if (autoPlay && playlist.length > 0) playSong(0);
         });
@@ -613,3 +763,23 @@ resetBtn.addEventListener('click', () => {
   });
   localStorage.setItem('eqValues', JSON.stringify(eqBands.map(() => 0)));
 });
+
+window.electronAPI.onScanProgress(({ current, total, message }) => {
+  showProgressNotification(message, current / total);
+});
+
+function showProgressNotification(message, progress = 0) {
+  const tooltip = document.getElementById("progressTooltip");
+  const msg = document.getElementById("progressMessage");
+  const fill = document.getElementById("progressFill");
+
+  msg.textContent = message;
+  fill.style.width = `${Math.round(progress * 100)}%`;
+
+  tooltip.style.display = "block";
+
+  // opcional: ocultar automáticamente cuando llegue al 100%
+  if (progress >= 1) {
+    setTimeout(() => { tooltip.style.display = "none"; }, 500);
+  }
+}

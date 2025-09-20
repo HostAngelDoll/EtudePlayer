@@ -1,10 +1,19 @@
+//preload.js
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   showContextMenu: (options) => ipcRenderer.invoke("show-context-menu", options),
   onContextPlaySelected: (callback) => {
+    ipcRenderer.removeAllListeners("context-play-selected");
     ipcRenderer.on("context-play-selected", callback);
   },
+
+  onScanProgress: (callback) => {
+    ipcRenderer.removeAllListeners("scan-progress");
+    ipcRenderer.on("scan-progress", (event, progress) => callback(progress));
+  },
+
+
   getPlaylists: async () => {
     try {
       return await ipcRenderer.invoke('get-playlists');

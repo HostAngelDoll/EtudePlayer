@@ -41,6 +41,7 @@ Other Tools to unify EtudePlayer (Etude Studio):
 
 ------------------------------------------------------------------------------------------------
 
+
 ✅ Mejoras en la playlist:
   - funcione como un listbox, poder selecionar uno o varios elementos
   - debe poder tener 1 o más columnas
