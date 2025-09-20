@@ -183,8 +183,6 @@ function getNameAndYear(rawFileUrl) {
   return `${pathSubstring}. ${filename}`;
 }
 
-
-
 function playSong(index) { // Reproducir canción por índice
   if (playlist.length === 0) return;
   songPath = playlist[index].path || playlist[index]; // ruta absoluta
