@@ -1,6 +1,10 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
+  showContextMenu: (options) => ipcRenderer.invoke("show-context-menu", options),
+  onContextPlaySelected: (callback) => {
+    ipcRenderer.on("context-play-selected", callback);
+  },
   getPlaylists: async () => {
     try {
       return await ipcRenderer.invoke('get-playlists');

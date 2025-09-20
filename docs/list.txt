@@ -36,12 +36,12 @@ Other Tools to unify EtudePlayer (Etude Studio):
 - ✅ Equalizer audio
 - ✅ Canciones del nodo xmas ordenadas por nombre de archivo y no por rutas, tras haber obtenido todas las canciones de las carpetas xmas
 - ✅ incluir tambien archivos mp4 (videos) y poder verlos
-- ⭕ Mejorar la playlist
+- 🟢 Mejorar la playlist
 - Mostrar una notificacion tooltip en el lado inferior derecho con progressbar para ver las operaciones de indexeado y actualizacion de carpetas y playlist, y mostrar tambien errores de la consola
 
+------------------------------------------------------------------------------------------------
 
-
-⭕ Mejoras en la playlist:
+✅ Mejoras en la playlist:
   - funcione como un listbox, poder selecionar uno o varios elementos
   - debe poder tener 1 o más columnas
   - habra 2 columnas: "nombre" y "duracion"
@@ -50,28 +50,45 @@ Other Tools to unify EtudePlayer (Etude Studio):
   - estilo de seleccion de uno o más
 
 
-Cachear indexeado de carpetas y playlist.
-  - Cachear la exploracion de carpetas de años y contenidos a igual que las playlist para no esperar a que todo cargue mientras se van detecando cambios en playlist y carpetas de años mientras se inicia el programa, esa operacion se usara tambien cuando se detecten cambios.
-
-
-Integracion del menu contextual de electron a los elementos de la playlist
+✅ Integracion del menu contextual de electron a los elementos de la playlist
   - click derecho para ver un menu conceptual (vacio por ahora, listo para agregar cosas)
   - habra 2 menus para un elemento seleccionado y otro para elementos multiples seleccionados
+  - elementos de prueba para comprobar funcionalidad, luego 
+
+
+Cachear indexeado de carpetas y playlist, y notificacion de proceso de carpetas y playlist.
+  - Mostrar una notificacion tooltip en el lado inferior derecho con progressbar como en vscode para ver las operaciones de indexeado y actualizacion de carpetas y playlist, y mostrar tambien errores de la consola
+  - Cachear la exploracion de carpetas de años y contenidos a igual que las playlist para no esperar a que todo cargue mientras se van detecando cambios en playlist y carpetas de años mientras se inicia el programa, esa operacion se usara tambien cuando se detecten cambios.
+
 
 Eventos de la playlist:
   - al haber movido o haber quitado una cancion se actualiza la playlist
   - o haber cambios en las carpetas de las canciones tanto agregado como movimientos y eliminacion
 
-Menu conceptual para un solo elemento:
-  - mover a carpeta 
-  - cambiar nombre
-  - copiar nombre del archivo
-  - mover a papelera
 
-Menu conceptual para varios elementos seleccionados:
-  - mover a carpeta
-  - copiar nombres de los archivos
-  - mover a papelera
+------------------------------------------------------------------------------------------------
+
+
+Menu conceptual para un solo elemento:
+  - Para menu contextual cuando hay un solo elemento y varios seleciconados:
+    - mover a carpeta (dialog futuro)
+    - mover a papelera ("E:/_Exclude/l_reallydeleted")
+
+  - cuando esta un solo elemento seleccionado
+    - cambiar nombre 
+    - copiar nombre del archivo
+    - copiar ruta de archivo
+
+  - cuando hay elementos multiples seleccionados
+    - copiar nombres de archivo
+    - copiar rutas de archivo
+
+  - mecanismo de cambiar el nombre al archivo
+    - un dialog con un input para cambiar el nombre al archivo (botones ok y cancelar)
+    - despues la playlist se actualiza con el nuevo nombre en cuando apariencia como en el alamcenado de las playlist
+
+  - el dialog para mover los archivos se dara despues de implementar lo de ahora.
+  
 
 Funcionamiento de la Dialog para mover archivos:
   - habra un elemento primero y sera "./" para ir a carpeta arriba

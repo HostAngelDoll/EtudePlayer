@@ -22,3 +22,9 @@
   font-weight: bold;         /* negrita para la canción que se reproduce */
   background-color: #99ccff; /* fondo azul más intenso */
 }
+
+.playlist tr.selected.playing {
+  background-color: #0060a0;   /* color de fondo seleccionado */
+  color: white;                /* texto blanco */
+  font-weight: bold;           /* texto en negrita */
+}

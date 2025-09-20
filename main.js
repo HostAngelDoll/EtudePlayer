@@ -1,5 +1,5 @@
 // main.js
-const { app, BrowserWindow, ipcMain, session } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, session } = require('electron');
 const path = require('path');
 const fs = require('fs').promises;
 let win;
@@ -170,6 +170,42 @@ ipcMain.on('select-folder', (event, folderPath) => { //ext check
 
   win.webContents.send('playlist-updated', { folderPath, files });
 
+});
+
+ipcMain.handle("show-context-menu", (event, { type }) => {
+  let template = [];
+
+  if (type === "single") {
+    
+    template = [
+      {
+        label: "▶ Reproducir canción",
+        click: () => {
+          event.sender.send("context-play-selected");
+        }
+      },
+      { type: "separator" },
+      {
+        label: "Opción de prueba (single)",
+        click: () => {
+          console.log("Menú contextual SINGLE");
+        }
+      }
+    ];
+
+  } else if (type === "multiple") {
+    template = [
+      {
+        label: "Opción de prueba (multiple)",
+        click: () => {
+          console.log("Menú contextual MULTIPLE");
+        }
+      }
+    ];
+  }
+
+  const menu = Menu.buildFromTemplate(template);
+  menu.popup(BrowserWindow.fromWebContents(event.sender));
 });
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

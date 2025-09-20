@@ -125,21 +125,54 @@ function updatePlaylistUI() {
     tr.addEventListener('dblclick', () => {
       playSong(index);
       // tbody.querySelectorAll('tr').forEach(r => r.classList.remove('playing'));      
-      tr.classList.add('playing');      
+      tr.classList.add('playing');
       // al oprimir stop no deberia marcar
     });
 
     // Click derecho
-    tr.addEventListener('contextmenu', (e) => {
+    // tr.addEventListener('contextmenu', (e) => {
+    //   e.preventDefault();
+    //   tbody.querySelectorAll('tr').forEach(r => r.classList.remove('selected'));
+    //   tr.classList.add('selected');
+    //   console.log("Mostrar menú contextual para:", song.name);
+    // });
+
+    tr.addEventListener("contextmenu", (e) => {
       e.preventDefault();
-      tbody.querySelectorAll('tr').forEach(r => r.classList.remove('selected'));
-      tr.classList.add('selected');
-      console.log("Mostrar menú contextual para:", song.name);
+
+      const tbody = document.querySelector("#playlist tbody");
+      const selectedRows = tbody.querySelectorAll("tr.selected");
+
+      // Si la fila sobre la que hice click derecho NO está en la selección actual,
+      // entonces hacemos que sea la única seleccionada
+      if (!tr.classList.contains("selected")) {
+        tbody.querySelectorAll("tr").forEach(r => r.classList.remove("selected"));
+        tr.classList.add("selected");
+      }
+
+      // Ver cuántos hay seleccionados ahora
+      const newSelection = tbody.querySelectorAll("tr.selected");
+      const type = newSelection.length > 1 ? "multiple" : "single";
+
+      // Llamar al menú contextual en main
+      window.electronAPI.showContextMenu({ type });
     });
 
     tbody.appendChild(tr);
   });
+  
 }
+
+window.electronAPI.onContextPlaySelected(() => {
+  const tbody = document.querySelector("#playlist tbody");
+  const selectedRow = tbody.querySelector("tr.selected");
+  if (!selectedRow) return;
+
+  const index = parseInt(selectedRow.dataset.index, 10);
+  if (!isNaN(index)) {
+    playSong(index);
+  }
+});
 
 function getNameAndYear(rawFileUrl) {
   let path = rawFileUrl.replace(/^file:\/+/, ''); // 1. Eliminar el prefijo "file://"
