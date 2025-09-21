@@ -66,8 +66,6 @@ Other Tools to unify EtudePlayer (Etude Studio):
   - o haber cambios en las carpetas de las canciones tanto agregado como movimientos y eliminacion
   - aplica tambien para canciones de navidad al vigilar todas las carpetas
 
-# corregido y agregado: quitar mensaje de que han hecho cambios cuando en realidad se carga la carpeta por primera vez y ajustes de playlist en elemento en playling tras hacer cambios en carpetas seleccionadas. integrados totalmente las notificaciones de cambios de carpeta, cachedo de playlist de carpetas, menu contextual, eventos de cambios de carpetas. se han movido archivos css a sus carpetas.
-
 
 ------------------------------------------------------------------------------------------------
 
