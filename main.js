@@ -2,7 +2,14 @@
 const { app, BrowserWindow, ipcMain, Menu, session } = require('electron');
 const path = require('path');
 const fs = require('fs').promises;
+const chokidar = require("chokidar");
+let watchers = new Map();
 const CACHE_PATH = path.join(app.getPath("userData"), "cache.json");
+
+const XMAS_START_YEAR = 2004;
+const XMAS_END_YEAR = 2021;
+const ROOT_YEARS_PATH = "E:\\_Internal";
+
 let win;
 
 async function createWindow() {
@@ -45,8 +52,7 @@ async function getFolderNodes(folderPath) {
   }
 }
 
-// Guardar cache
-async function saveCache(data) {
+async function saveCache(data) { // Guardar cache
   try {
     await fs.writeFile(CACHE_PATH, JSON.stringify(data, null, 2));
   } catch (err) {
@@ -54,8 +60,7 @@ async function saveCache(data) {
   }
 }
 
-// Leer cache
-async function loadCache() {
+async function loadCache() { // Leer cache
   try {
     const content = await fs.readFile(CACHE_PATH, "utf-8");
     return JSON.parse(content);
@@ -63,7 +68,6 @@ async function loadCache() {
     return null; // si no existe, devuelve null
   }
 }
-
 
 ipcMain.handle('get-playlists', async (event) => {
   let cached = await loadCache();
@@ -139,109 +143,33 @@ ipcMain.handle('get-playlists', async (event) => {
   return result;
 });
 
-
-// Handler de IPC actualizado
-// ipcMain.handle('get-playlists', async () => {
-//   const rootPath = "E:\\_Internal";
-//   try {
-//     const yearDirs = await fs.readdir(rootPath, { withFileTypes: true });
-//     const years = yearDirs.filter(d => d.isDirectory() && /^\d{4}$/.test(d.name))
-//       .map(d => d.name);
-
-//     const playlists = [];
-
-//     for (const year of years) {
-//       const yearPath = path.join(rootPath, year);
-//       const prefix = String(year - 2003).padStart(2, '0');
-//       const nodes = [];
-
-//       // Main
-//       const mainTemp = path.join(yearPath, `${prefix}. music.main`);
-//       try {
-//         await fs.access(mainTemp);
-//         const mainNodes = await getFolderNodes(mainTemp);
-//         nodes.push({ name: 'Main', type: 'folder', path: mainTemp, nodes: mainNodes });
-//       } catch { } // si no existe, no hace nada
-
-//       // Album Package
-//       const albumPath = path.join(yearPath, `${prefix}. music.registry.album.package`);
-//       try {
-//         await fs.access(albumPath);
-//         const albumNodes = await getFolderNodes(albumPath);
-//         nodes.push({ name: 'Album Package', type: 'folder', path: albumPath, nodes: albumNodes });
-//       } catch { }
-
-//       // Base
-//       const basePath = path.join(yearPath, `${prefix}. music.registry.base`);
-//       try {
-//         await fs.access(basePath);
-//         nodes.push({ name: 'Base', type: 'folder', path: basePath, nodes: [] });
-//       } catch { }
-
-//       // Theme
-//       const themePath = path.join(yearPath, `${prefix}. music.theme`);
-//       try {
-//         await fs.access(themePath);
-//         const themeNodes = await getFolderNodes(themePath);
-//         nodes.push({ name: 'Theme', type: 'folder', path: themePath, nodes: themeNodes });
-//       } catch { }
-
-//       playlists.push({ year, nodes });
-//     }
-
-//     // Nodo especial Xmas
-//     const xmasNode = {
-//       name: 'Xmas',
-//       type: 'folder',
-//       path: null,
-//       nodes: [
-//         { name: 'All Songs', type: 'xmas-all', path: rootPath }
-//       ]
-//     };
-
-//     return { playlists, xmas: xmasNode };
-
-//   } catch (err) {
-//     console.error('Error obteniendo playlists:', err);
-//     return { playlists: [], xmas: null };
-//   }
-// });
-
-ipcMain.handle('get-xmas-songs', async (event, rootPath) => { //ext check
+ipcMain.handle('get-xmas-songs', async (event, rootPath) => {
   try {
-    const yearDirs = await fs.readdir(rootPath, { withFileTypes: true });
-    const years = yearDirs.filter(d => d.isDirectory() && /^\d{4}$/.test(d.name))
-      .map(d => d.name);
-
-    let allSongs = [];
-
-    for (const year of years) {
-      const prefix = String(year - 2003).padStart(2, '0');
-      const xmasPath = path.join(rootPath, year, `${prefix}. music.xmas`);
-
-      try {
-        await fs.access(xmasPath);
-        const entries = await fs.readdir(xmasPath, { withFileTypes: true });
-        const mediaFiles = entries
-          .filter(f => f.isFile() && (f.name.toLowerCase().endsWith('.mp3') || f.name.toLowerCase().endsWith('.mp4')))
-          .map(f => path.join(xmasPath, f.name));
-        allSongs = allSongs.concat(mediaFiles);
-
-      } catch {
-        // carpeta xmas no existe para este año, continuar
-      }
-    }
-
-    return allSongs;
+    const base = rootPath || ROOT_YEARS_PATH;
+    const songs = await gatherXmasSongs(base);
+    return songs;
   } catch (err) {
-    console.error(`Error obteniendo canciones Xmas desde ${rootPath}:`, err);
+    console.error('Error obteniendo Xmas songs:', err);
     return [];
   }
 });
 
-// Manejar petición de canciones desde el renderer
-ipcMain.handle('get-songs', async (event, folderPath) => { //ext check
+ipcMain.on('select-xmas', async (event, baseRoot) => {
+  try {
+    const base = baseRoot || ROOT_YEARS_PATH;
+    // Enviar playlist inicial combinada
+    const songs = await gatherXmasSongs(base);
+    win.webContents.send('playlist-updated', { folderPath: 'xmas-all', files: songs });
 
+    // Iniciar watchers en todas las carpetas Xmas del rango
+    await watchXmasFolders(base);
+  } catch (err) {
+    console.error('Error al activar Xmas watch:', err);
+  }
+});
+
+ipcMain.handle('get-songs', async (event, folderPath) => { //ext check
+  // Manejar petición de canciones desde el renderer
   try {
     const entries = await fs.readdir(folderPath, { withFileTypes: true });
     const files = entries
@@ -254,16 +182,6 @@ ipcMain.handle('get-songs', async (event, folderPath) => { //ext check
     console.error(`Error leyendo carpeta de canciones ${folderPath}:`, err);
     return [];
   }
-
-});
-
-ipcMain.on('select-folder', (event, folderPath) => { //ext check
-
-  const files = fs.readdirSync(folderPath)
-    .filter(f => f.endsWith('.mp3') || f.endsWith('.mp4'))  // Incluye mp3 y mp4
-    .map(f => path.join(folderPath, f));
-
-  win.webContents.send('playlist-updated', { folderPath, files });
 
 });
 
@@ -304,3 +222,120 @@ ipcMain.handle("show-context-menu", (event, { type }) => {
 });
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+
+// ------------------------------------------------
+
+
+// Función para iniciar vigilancia de una carpeta específica
+function watchFolder(folderPath, opts = {}) {
+  // opts = { type: 'single' | 'xmas', rootForXmas: baseRoot }
+
+  if (watchers.has(folderPath)) {
+    try { watchers.get(folderPath).close(); } catch(e){}
+  }
+
+  // Crear watcher
+  const watcher = chokidar.watch(folderPath, {
+    ignored: /(^|[\/\\])\../, // ignorar archivos ocultos
+    persistent: true,
+    ignoreInitial: true,       // no emitir eventos de archivos existentes
+    depth: 0,                  // solo la carpeta actual, no subcarpetas
+    awaitWriteFinish: {         // esperar a que la escritura termine
+      stabilityThreshold: 200,
+      pollInterval: 100
+    }
+  });
+
+  // Función para notificar cambios (con debounce)
+  let debounceTimer = null;
+  const notifyChange = () => {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(async () => {
+      try {
+
+        if (opts.type === 'xmas') {
+          // Re-armar lista combinada y enviarla
+          const list = await gatherXmasSongs(opts.rootForXmas || ROOT_YEARS_PATH);
+          win.webContents.send('playlist-updated', { folderPath: 'xmas-all', files: list });
+
+        } else {
+          // Leer solo la carpeta
+          const entries = await fs.readdir(folderPath, { withFileTypes: true });
+          const files = entries
+            .filter(f => f.isFile() && (f.name.toLowerCase().endsWith('.mp3') || f.name.toLowerCase().endsWith('.mp4')))
+            // .map(f => path.join(folderPath, f.name));
+            .map(f => ({ name: f.name, path: `${folderPath}\\${f.name}` }));
+          // win.webContents.send('playlist-updated', { folderPath, files });
+          win.webContents.send('folder-updated', { folderPath, files });
+        }
+
+      } catch (err) {
+        console.error(`Error al leer carpeta ${folderPath}:`, err);
+      }
+    }, 200); // 200ms de debounce
+  };
+
+  watcher
+    .on('add', notifyChange)
+    .on('unlink', notifyChange)
+    .on('change', notifyChange)
+    .on('error', err => console.error(`Watcher error: ${err}`));
+
+  watchers[folderPath] = watcher;
+}
+
+async function watchXmasFolders(baseRoot = ROOT_YEARS_PATH) {
+  for (let year = XMAS_START_YEAR; year <= XMAS_END_YEAR; year++) {
+    const folder = getXmasFolderPath(year, baseRoot);
+    try {
+      await fs.access(folder); // existe
+      watchFolder(folder, { type: 'xmas', rootForXmas: baseRoot });
+    } catch (e) { /* no existe → ignorar*/ }
+  }
+}
+
+// Modificar el listener de 'select-folder' para activar vigilancia
+ipcMain.on('select-folder', async (event, folderPath) => {
+  try {
+    const files = await fs.readdir(folderPath);
+    const mediaFiles = files.filter(f => f.endsWith('.mp3') || f.endsWith('.mp4'))
+      .map(f => `${folderPath}\\${f}`);
+
+    // Enviar playlist inicial
+    // win.webContents.send('playlist-updated', { folderPath, files: mediaFiles });
+    win.webContents.send('folder-updated', { folderPath, files: mediaFiles });
+
+    // Iniciar vigilancia
+    watchFolder(folderPath);
+
+  } catch (err) {
+    console.error(`Error leyendo carpeta "${folderPath}":`, err);
+  }
+});
+
+
+// Construir ruta example: E:\_Internal\2006\03. music.xmas
+function getXmasFolderPath(year, baseRoot = ROOT_YEARS_PATH) {
+  const index = String(year - 2003).padStart(2, '0');
+  return path.join(baseRoot, String(year), `${index}. music.xmas`);
+}
+
+// Reutilizable: devolver todas las canciones Xmas (full paths) entre 2004..2021
+async function gatherXmasSongs(baseRoot = ROOT_YEARS_PATH) {
+  const allSongs = [];
+  for (let year = XMAS_START_YEAR; year <= XMAS_END_YEAR; year++) {
+    const folder = getXmasFolderPath(year, baseRoot);
+    try {
+      await fs.access(folder);
+      const entries = await fs.readdir(folder, { withFileTypes: true });
+      const mediaFiles = entries
+        .filter(f => f.isFile() && (f.name.toLowerCase().endsWith('.mp3') || f.name.toLowerCase().endsWith('.mp4')))
+        .map(f => path.join(folder, f.name));
+      allSongs.push(...mediaFiles);
+    } catch (e) { /* carpeta no existe → ignorar */ }
+  }
+  return allSongs;
+}
+
+
+// Next file is preload.js

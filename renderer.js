@@ -1,4 +1,9 @@
-//renderer.js
+// ##########################################
+// Advertencia: 
+// No tener todas las partes del renderer.js significa no poder hacerle juicio hasta que este entrgeado
+// renderer.js // part-1 to 3
+// ##########################################
+
 const playlistDiv = document.getElementById('playlist');
 const prevBtn = document.getElementById('prevBtn');
 const nextBtn = document.getElementById('nextBtn');
@@ -29,24 +34,29 @@ const originalTitle = "EtudePlayer";
 const eqBands = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
 let wavesurfer = null;
 let previousVolume = 1;
-let currentSongIndex = 0;
+let currentSongIndex = -1; // let currentIndex = -1;
 let playlist = [];
 let autoPlay = false;
 let activeFolderEl = null;
-let pitchValue = 1.0; // valor persistente
+let pitchValue = 1.0;
 let audioContext = null; // Definir bandas del ecualizador
 let eqFilters = [];
 let mediaNode = null;
-let songPath = null;
+let songPath = null; // 3let currentAudio = null;
 let playlistCache = {};
+let isOpenFolder = false;
 volumeLabel.textContent = `${volumeSlider.value}%`;
+document.title = originalTitle;
 
 
 // -----------------------------------------------------
 // funciones de renderer
 // -----------------------------------------------------
 
-function vaciarPlaylistCache() { localStorage.removeItem('playlistCache'); }
+function vaciarPlaylistCache() {
+  playlistCache = {};
+  localStorage.removeItem('playlistCache');
+}
 
 function deriveFolderFromPath(p) {
   if (!p || typeof p !== 'string') return null;
@@ -73,7 +83,7 @@ async function getAudioDurationSeconds(src) {
       function cleanup() {
         a.removeEventListener('loadedmetadata', onLoaded);
         a.removeEventListener('error', onError);
-        try { a.src = ''; } catch (e) {}
+        try { a.src = ''; } catch (e) { }
       }
       a.addEventListener('loadedmetadata', onLoaded, { once: true });
       a.addEventListener('error', onError, { once: true });
@@ -86,7 +96,7 @@ async function getAudioDurationSeconds(src) {
 
 // songsArray: array de strings (paths) o array de objetos {name, path}
 // cacheKey: string identificador para cache (ej: folderPath o 'xmas-all')
-async function loadPlaylistFromArray(songsArray, cacheKey) {
+async function loadPlaylistFromArray(songsArray, cacheKey, forceNext = false) {
   if (!Array.isArray(songsArray)) return;
 
   // generar cacheKey si no viene
@@ -104,7 +114,7 @@ async function loadPlaylistFromArray(songsArray, cacheKey) {
   });
 
   // usar cache si existe y tiene contenido
-  if (playlistCache[cacheKey] && Array.isArray(playlistCache[cacheKey]) && playlistCache[cacheKey].length > 0) {
+  if (playlistCache[cacheKey] && Array.isArray(playlistCache[cacheKey]) && playlistCache[cacheKey].length > 0 && forceNext === false) {
     console.log('Usando cache para', cacheKey);
     playlist = playlistCache[cacheKey];
     updatePlaylistUI();
@@ -120,9 +130,9 @@ async function loadPlaylistFromArray(songsArray, cacheKey) {
     const songPath = (typeof item === 'string') ? item : (item.path || item.name);
 
     // derivar nombre si no viene
-    let name = (typeof item === 'object' && item.name) 
-    ? item.name 
-    : (songPath ? songPath.split(/[\\/]/).pop() : `track-${i+1}`);
+    let name = (typeof item === 'object' && item.name)
+      ? item.name
+      : (songPath ? songPath.split(/[\\/]/).pop() : `track-${i + 1}`);
 
     name = getNameAndYear_forArray(songPath);
 
@@ -200,6 +210,15 @@ function clearPlayingStyle() {
   });
 }
 
+
+// ##########################################
+// Advertencia: 
+// No tener todas las partes del renderer.js significa no poder hacerle juicio hasta que este entrgeado
+
+// renderer.js // part-2 to 3
+// ##########################################
+
+
 function updatePlaylistUI() {
   const tbody = document.querySelector('#playlist tbody');
   tbody.innerHTML = '';
@@ -207,6 +226,7 @@ function updatePlaylistUI() {
   playlist.forEach((song, index) => {
     const tr = document.createElement('tr');
     tr.dataset.index = index;
+    tr.dataset.path = song.path || song;   // ✅ nuevo: guardar path real
 
     // Columna nombre
     const tdName = document.createElement('td');
@@ -273,6 +293,17 @@ function updatePlaylistUI() {
 
     tbody.appendChild(tr);
   });
+
+  // ✅ Restaurar resaltado de la canción en curso tras refresh
+  if (songPath) {
+    clearPlayingStyle();
+    const rows = tbody.querySelectorAll("tr");
+    rows.forEach(row => {
+      if (row.dataset.path === songPath) {
+        row.classList.add("playing");
+      }
+    });
+  }
 
 }
 
@@ -406,8 +437,52 @@ function setActiveFolder(el) {
   activeFolderEl = el;
 }
 
+// para los folders de cada año
+window.electronAPI.onFolderUpdated(async (files, folderPath) => {
+  // Convertir a formato {name, path} si viene como string
+  const songsArray = files.map(f => (typeof f === 'string' ? { name: f.split(/[\\/]/).pop(), path: f } : f));
+
+  // Cargar playlist desde array (recalcula duración, ordena alfabéticamente, actualiza cache)
+  await loadPlaylistFromArray(songsArray, folderPath, true);
+
+  // Mostrar tooltip de notificación
+  if (!isOpenFolder) {
+    showProgressNotification(`La carpeta "${folderPath}" ha cambiado`, 1);
+  } else {
+    isOpenFolder = false;
+  }
+});
+
+// de la carpetas unidas (xmas)
+window.electronAPI.onPlaylistUpdated(async (payload) => {
+  if (!payload || !Array.isArray(payload.files)) return;
+
+  const folderKey = payload.folderPath || deriveFolderFromPath(payload.folderPath) || payload.folderPath;
+
+  // Forzar refresco: eliminar cache temporal para esa key
+  if (typeof folderKey === 'string') {
+    delete playlistCache[folderKey];
+    try { localStorage.setItem('playlistCache', JSON.stringify(playlistCache)); } catch (e) { }
+  }
+
+  // Mapear a {name,path}
+  const songsArray = payload.files.map(f => ({ name: f.split(/[\\/]/).pop(), path: f }));
+
+  // Cargar (recalcula duraciones para los no cacheados)
+  await loadPlaylistFromArray(songsArray, folderKey, true);
+
+  // Notificar al usuario (tooltip cerrable manualmente)
+  if (!isOpenFolder) {
+    showProgressNotification(`La carpeta "${payload.folderPath}" ha cambiado`, 1);
+  } else {
+    isOpenFolder = false;
+  }
+});
+
+
 // Cargar árbol y manejar clicks en nodos
 window.addEventListener('DOMContentLoaded', async () => {
+
   try {
     const savedCache = localStorage.getItem('playlistCache');
     if (savedCache) {
@@ -458,6 +533,9 @@ window.addEventListener('DOMContentLoaded', async () => {
       if (node.type === 'folder' && node.path) {
         await loadPlaylistFromFolder(node.path);
 
+        isOpenFolder = true;
+        window.electronAPI.selectFolder(node.path); // <- nueva función que vamos a exponer
+        
         node.loadedSongs = true; // marca que ya cargamos
         if (autoPlay && playlist.length > 0) playSong(0); // solo si el flag autoPlay está activo
       }
@@ -475,9 +553,14 @@ window.addEventListener('DOMContentLoaded', async () => {
             path: f // ruta completa
           }));
 
+          isOpenFolder = true;
           await loadPlaylistFromArray(songs, 'xmas-all'); // cacheKey claro 'xmas-all'
 
+          window.electronAPI.selectXmas(node.path);
+
           if (autoPlay && playlist.length > 0) playSong(0);
+
+          
         });
       }
 
@@ -487,13 +570,8 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 
   const ul = document.createElement('ul');
-
-  data.playlists.forEach(year => {
-    ul.appendChild(createNode({ name: year.year, nodes: year.nodes }));
-  });
-
+  data.playlists.forEach(year => { ul.appendChild(createNode({ name: year.year, nodes: year.nodes })); });
   ul.appendChild(createNode(data.xmas));
-
   treeContainer.appendChild(ul);
 });
 
@@ -544,6 +622,12 @@ btnVolUp.addEventListener('click', () => {
   updateVolumeUI(newVolume);
 });
 
+
+// ##########################################
+// Advertencia: 
+// No tener todas las partes del renderer.js significa no poder hacerle juicio hasta que este entrgeado
+// renderer.js // part-3 to 3
+// ##########################################
 
 // ----------------------------------------------------------------
 // Waveform slider
@@ -623,8 +707,8 @@ function initWaveform(audioPath) {
     wavesurfer.destroy();
   }
 
-  const _wave_color = '#999'
-  const _progress_Color = '#007acc'
+  const _wave_color = '#909090ff'
+  const _progress_Color = '#383838ff'
 
   if (audioPath.toLowerCase().endsWith('.mp4')) {
     // mostrar el contenedor de video
@@ -741,6 +825,25 @@ function initWaveform(audioPath) {
       statusBar.textContent = "Paused";
     }
   });
+
+  wavesurfer.on('error', (errMsg) => {
+    console.error('WaveSurfer error:', errMsg);
+
+    // Opcional: mostrar mensaje al usuario
+    statusBar.textContent = `Error al reproducir: ${errMsg}`;
+
+    // Saltar a la siguiente canción si hay playlist
+    if (playlist.length > 0) {
+      currentSongIndex = (currentSongIndex + 1) % playlist.length;
+      playSong(currentSongIndex);
+    } else {
+      // Si no hay más canciones, restablecer estado
+      document.title = originalTitle;
+      songPath = null;
+      statusBar.textContent = originalTitle;
+      clearPlayingStyle();
+    }
+  });
 }
 
 // Vincular sliders a filtros y almacenamiento
@@ -780,6 +883,11 @@ function showProgressNotification(message, progress = 0) {
 
   // opcional: ocultar automáticamente cuando llegue al 100%
   if (progress >= 1) {
-    setTimeout(() => { tooltip.style.display = "none"; }, 500);
+    setTimeout(() => { tooltip.style.display = "none"; }, 2500);
   }
 }
+
+
+// ##########################################
+// next file -> index.html
+// ##########################################

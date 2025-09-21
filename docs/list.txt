@@ -57,14 +57,16 @@ Other Tools to unify EtudePlayer (Etude Studio):
   - elementos de prueba para comprobar funcionalidad, luego 
 
 
-Cachear indexeado de carpetas y playlist, y notificacion de proceso de carpetas y playlist.
+✅ Cachear indexeado de carpetas y playlist, y notificacion de proceso de carpetas y playlist.
   - Mostrar una notificacion tooltip en el lado inferior derecho con progressbar como en vscode para ver las operaciones de indexeado y actualizacion de carpetas y playlist, y mostrar tambien errores de la consola
   - Cachear la exploracion de carpetas de años y contenidos a igual que las playlist para no esperar a que todo cargue mientras se van detecando cambios en playlist y carpetas de años mientras se inicia el programa, esa operacion se usara tambien cuando se detecten cambios.
 
-
-Eventos de la playlist:
+✅ Eventos de la playlist:
   - al haber movido o haber quitado una cancion se actualiza la playlist
   - o haber cambios en las carpetas de las canciones tanto agregado como movimientos y eliminacion
+  - aplica tambien para canciones de navidad al vigilar todas las carpetas
+
+# corregido y agregado: quitar mensaje de que han hecho cambios cuando en realidad se carga la carpeta por primera vez y ajustes de playlist en elemento en playling tras hacer cambios en carpetas seleccionadas. integrados totalmente las notificaciones de cambios de carpeta, cachedo de playlist de carpetas, menu contextual, eventos de cambios de carpetas. se han movido archivos css a sus carpetas.
 
 
 ------------------------------------------------------------------------------------------------
