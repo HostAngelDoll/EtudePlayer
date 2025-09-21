@@ -437,7 +437,7 @@ function setActiveFolder(el) {
   activeFolderEl = el;
 }
 
-// para los folders de cada año
+// carpetas de cada año
 window.electronAPI.onFolderUpdated(async (files, folderPath) => {
   // Convertir a formato {name, path} si viene como string
   const songsArray = files.map(f => (typeof f === 'string' ? { name: f.split(/[\\/]/).pop(), path: f } : f));
@@ -453,7 +453,7 @@ window.electronAPI.onFolderUpdated(async (files, folderPath) => {
   }
 });
 
-// de la carpetas unidas (xmas)
+// carpetas unidas (xmas)
 window.electronAPI.onPlaylistUpdated(async (payload) => {
   if (!payload || !Array.isArray(payload.files)) return;
 
@@ -690,7 +690,7 @@ function crearVideoPlayer(url) {
   container.style.display = 'block';
 }
 
-function destruirVideoPlayer() {
+function apagarVideoPlayer() {
   const container = document.getElementById('videoContainer');
   if (container.childElementCount === 0) return
 
@@ -708,7 +708,7 @@ function initWaveform(audioPath) {
   }
 
   const _wave_color = '#909090ff'
-  const _progress_Color = '#383838ff'
+  const _progress_Color = '#5d5d5dff'
 
   if (audioPath.toLowerCase().endsWith('.mp4')) {
     // mostrar el contenedor de video
@@ -725,7 +725,7 @@ function initWaveform(audioPath) {
 
   } else {
     // ocultar video si no es mp4
-    destruirVideoPlayer()
+    apagarVideoPlayer()
 
     wavesurfer = WaveSurfer.create({
       container: '#waveform',

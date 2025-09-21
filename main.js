@@ -1,18 +1,16 @@
 // main.js
-const { app, BrowserWindow, ipcMain, Menu, session } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs').promises;
 const chokidar = require("chokidar");
-let watchers = new Map();
 const CACHE_PATH = path.join(app.getPath("userData"), "cache.json");
-
 const XMAS_START_YEAR = 2004;
 const XMAS_END_YEAR = 2021;
 const ROOT_YEARS_PATH = "E:\\_Internal";
-
+let watchers = new Map();
 let win;
 
-async function createWindow() {
+async function createWindow() { // main function to start app
   win = new BrowserWindow({
     width: 1200,
     height: 720,
@@ -27,8 +25,6 @@ async function createWindow() {
   win.loadFile('index.html');
 
 }
-
-app.whenReady().then(createWindow);
 
 async function getFolderNodes(folderPath) {
   try {
@@ -67,6 +63,97 @@ async function loadCache() { // Leer cache
   } catch {
     return null; // si no existe, devuelve null
   }
+}
+
+function getXmasFolderPath(year, baseRoot = ROOT_YEARS_PATH) {
+  // Construir ruta example: E:\_Internal\2006\03. music.xmas
+  const index = String(year - 2003).padStart(2, '0');
+  return path.join(baseRoot, String(year), `${index}. music.xmas`);
+}
+
+function watchFolder(folderPath, opts = {}) {
+  // Función para iniciar vigilancia de una carpeta específica
+  // opts = { type: 'single' | 'xmas', rootForXmas: baseRoot }
+
+  if (watchers.has(folderPath)) {
+    try { watchers.get(folderPath).close(); } catch(e){}
+  }
+
+  // Crear watcher
+  const watcher = chokidar.watch(folderPath, {
+    ignored: /(^|[\/\\])\../, // ignorar archivos ocultos
+    persistent: true,
+    ignoreInitial: true,       // no emitir eventos de archivos existentes
+    depth: 0,                  // solo la carpeta actual, no subcarpetas
+    awaitWriteFinish: {         // esperar a que la escritura termine
+      stabilityThreshold: 200,
+      pollInterval: 100
+    }
+  });
+
+  // Función para notificar cambios (con debounce)
+  let debounceTimer = null;
+  const notifyChange = () => {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(async () => {
+      try {
+
+        if (opts.type === 'xmas') {
+          // Re-armar lista combinada y enviarla
+          const list = await gatherXmasSongs(opts.rootForXmas || ROOT_YEARS_PATH);
+          win.webContents.send('playlist-updated', { folderPath: 'xmas-all', files: list });
+
+        } else {
+          // Leer solo la carpeta
+          const entries = await fs.readdir(folderPath, { withFileTypes: true });
+          const files = entries
+            .filter(f => f.isFile() && (f.name.toLowerCase().endsWith('.mp3') || f.name.toLowerCase().endsWith('.mp4')))
+            // .map(f => path.join(folderPath, f.name));
+            .map(f => ({ name: f.name, path: `${folderPath}\\${f.name}` }));
+          // win.webContents.send('playlist-updated', { folderPath, files });
+          win.webContents.send('folder-updated', { folderPath, files });
+        }
+
+      } catch (err) {
+        console.error(`Error al leer carpeta ${folderPath}:`, err);
+      }
+    }, 200); // 200ms de debounce
+  };
+
+  watcher
+    .on('add', notifyChange)
+    .on('unlink', notifyChange)
+    .on('change', notifyChange)
+    .on('error', err => console.error(`Watcher error: ${err}`));
+
+  watchers[folderPath] = watcher;
+}
+
+async function watchXmasFolders(baseRoot = ROOT_YEARS_PATH) {
+  for (let year = XMAS_START_YEAR; year <= XMAS_END_YEAR; year++) {
+    const folder = getXmasFolderPath(year, baseRoot);
+    try {
+      await fs.access(folder); // existe
+      watchFolder(folder, { type: 'xmas', rootForXmas: baseRoot });
+    } catch (e) { /* no existe → ignorar*/ }
+  }
+}
+
+async function gatherXmasSongs(baseRoot = ROOT_YEARS_PATH) {
+  // Reutilizable: devolver todas las canciones Xmas (full paths) entre 2004..2021
+  const allSongs = [];
+  for (let year = XMAS_START_YEAR; year <= XMAS_END_YEAR; year++) {
+    const folder = getXmasFolderPath(year, baseRoot);
+    try {
+      await fs.access(folder);
+      const entries = await fs.readdir(folder, { withFileTypes: true });
+      const mediaFiles = entries
+        .filter(f => f.isFile() && (f.name.toLowerCase().endsWith('.mp3') || f.name.toLowerCase().endsWith('.mp4')))
+        .map(f => path.join(folder, f.name));
+      allSongs.push(...mediaFiles);
+    } catch (e) { /* carpeta no existe → ignorar */ }
+  }
+  return allSongs;
 }
 
 ipcMain.handle('get-playlists', async (event) => {
@@ -154,6 +241,24 @@ ipcMain.handle('get-xmas-songs', async (event, rootPath) => {
   }
 });
 
+ipcMain.on('select-folder', async (event, folderPath) => {
+  try {
+    const files = await fs.readdir(folderPath);
+    const mediaFiles = files.filter(f => f.endsWith('.mp3') || f.endsWith('.mp4'))
+      .map(f => `${folderPath}\\${f}`);
+
+    // Enviar playlist inicial
+    // win.webContents.send('playlist-updated', { folderPath, files: mediaFiles });
+    win.webContents.send('folder-updated', { folderPath, files: mediaFiles });
+
+    // Iniciar vigilancia
+    watchFolder(folderPath);
+
+  } catch (err) {
+    console.error(`Error leyendo carpeta "${folderPath}":`, err);
+  }
+});
+
 ipcMain.on('select-xmas', async (event, baseRoot) => {
   try {
     const base = baseRoot || ROOT_YEARS_PATH;
@@ -223,119 +328,6 @@ ipcMain.handle("show-context-menu", (event, { type }) => {
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 
-// ------------------------------------------------
-
-
-// Función para iniciar vigilancia de una carpeta específica
-function watchFolder(folderPath, opts = {}) {
-  // opts = { type: 'single' | 'xmas', rootForXmas: baseRoot }
-
-  if (watchers.has(folderPath)) {
-    try { watchers.get(folderPath).close(); } catch(e){}
-  }
-
-  // Crear watcher
-  const watcher = chokidar.watch(folderPath, {
-    ignored: /(^|[\/\\])\../, // ignorar archivos ocultos
-    persistent: true,
-    ignoreInitial: true,       // no emitir eventos de archivos existentes
-    depth: 0,                  // solo la carpeta actual, no subcarpetas
-    awaitWriteFinish: {         // esperar a que la escritura termine
-      stabilityThreshold: 200,
-      pollInterval: 100
-    }
-  });
-
-  // Función para notificar cambios (con debounce)
-  let debounceTimer = null;
-  const notifyChange = () => {
-    if (debounceTimer) clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(async () => {
-      try {
-
-        if (opts.type === 'xmas') {
-          // Re-armar lista combinada y enviarla
-          const list = await gatherXmasSongs(opts.rootForXmas || ROOT_YEARS_PATH);
-          win.webContents.send('playlist-updated', { folderPath: 'xmas-all', files: list });
-
-        } else {
-          // Leer solo la carpeta
-          const entries = await fs.readdir(folderPath, { withFileTypes: true });
-          const files = entries
-            .filter(f => f.isFile() && (f.name.toLowerCase().endsWith('.mp3') || f.name.toLowerCase().endsWith('.mp4')))
-            // .map(f => path.join(folderPath, f.name));
-            .map(f => ({ name: f.name, path: `${folderPath}\\${f.name}` }));
-          // win.webContents.send('playlist-updated', { folderPath, files });
-          win.webContents.send('folder-updated', { folderPath, files });
-        }
-
-      } catch (err) {
-        console.error(`Error al leer carpeta ${folderPath}:`, err);
-      }
-    }, 200); // 200ms de debounce
-  };
-
-  watcher
-    .on('add', notifyChange)
-    .on('unlink', notifyChange)
-    .on('change', notifyChange)
-    .on('error', err => console.error(`Watcher error: ${err}`));
-
-  watchers[folderPath] = watcher;
-}
-
-async function watchXmasFolders(baseRoot = ROOT_YEARS_PATH) {
-  for (let year = XMAS_START_YEAR; year <= XMAS_END_YEAR; year++) {
-    const folder = getXmasFolderPath(year, baseRoot);
-    try {
-      await fs.access(folder); // existe
-      watchFolder(folder, { type: 'xmas', rootForXmas: baseRoot });
-    } catch (e) { /* no existe → ignorar*/ }
-  }
-}
-
-// Modificar el listener de 'select-folder' para activar vigilancia
-ipcMain.on('select-folder', async (event, folderPath) => {
-  try {
-    const files = await fs.readdir(folderPath);
-    const mediaFiles = files.filter(f => f.endsWith('.mp3') || f.endsWith('.mp4'))
-      .map(f => `${folderPath}\\${f}`);
-
-    // Enviar playlist inicial
-    // win.webContents.send('playlist-updated', { folderPath, files: mediaFiles });
-    win.webContents.send('folder-updated', { folderPath, files: mediaFiles });
-
-    // Iniciar vigilancia
-    watchFolder(folderPath);
-
-  } catch (err) {
-    console.error(`Error leyendo carpeta "${folderPath}":`, err);
-  }
-});
-
-
-// Construir ruta example: E:\_Internal\2006\03. music.xmas
-function getXmasFolderPath(year, baseRoot = ROOT_YEARS_PATH) {
-  const index = String(year - 2003).padStart(2, '0');
-  return path.join(baseRoot, String(year), `${index}. music.xmas`);
-}
-
-// Reutilizable: devolver todas las canciones Xmas (full paths) entre 2004..2021
-async function gatherXmasSongs(baseRoot = ROOT_YEARS_PATH) {
-  const allSongs = [];
-  for (let year = XMAS_START_YEAR; year <= XMAS_END_YEAR; year++) {
-    const folder = getXmasFolderPath(year, baseRoot);
-    try {
-      await fs.access(folder);
-      const entries = await fs.readdir(folder, { withFileTypes: true });
-      const mediaFiles = entries
-        .filter(f => f.isFile() && (f.name.toLowerCase().endsWith('.mp3') || f.name.toLowerCase().endsWith('.mp4')))
-        .map(f => path.join(folder, f.name));
-      allSongs.push(...mediaFiles);
-    } catch (e) { /* carpeta no existe → ignorar */ }
-  }
-  return allSongs;
-}
-
+app.whenReady().then(createWindow);
 
 // Next file is preload.js
