@@ -2,11 +2,18 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
-  showContextMenu: (options) => ipcRenderer.invoke("show-context-menu", options),
+  showContextMenu: (options) => {
+    ipcRenderer.invoke("show-context-menu", options)
+  },
   onContextPlaySelected: (callback) => {
     ipcRenderer.removeAllListeners("context-play-selected");
     ipcRenderer.on("context-play-selected", callback);
   },
+  onContextMenuAction: (callback) => {
+    ipcRenderer.removeAllListeners("context-menu-action");
+    ipcRenderer.on("context-menu-action", (_, action) => callback(action));
+  },
+
   onScanProgress: (callback) => {
     ipcRenderer.removeAllListeners("scan-progress");
     ipcRenderer.on("scan-progress", (event, progress) => callback(progress));
@@ -50,7 +57,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onPlaylistUpdated: (callback) => {
     ipcRenderer.removeAllListeners('playlist-updated');
     ipcRenderer.on('playlist-updated', (event, payload) => callback(payload));
-  }
+  },
+
+  // Rename
+  renameFile: (payload) => ipcRenderer.invoke("rename-file", payload),
+  onFileRenamed: (callback) => {
+    ipcRenderer.removeAllListeners("file-renamed");
+    ipcRenderer.on("file-renamed", (_, payload) => callback(payload));
+  },
 
 });
 

@@ -111,6 +111,7 @@ function watchFolder(folderPath, opts = {}) {
             // .map(f => path.join(folderPath, f.name));
             .map(f => ({ name: f.name, path: `${folderPath}\\${f.name}` }));
           // win.webContents.send('playlist-updated', { folderPath, files });
+
           win.webContents.send('folder-updated', { folderPath, files });
         }
 
@@ -290,41 +291,68 @@ ipcMain.handle('get-songs', async (event, folderPath) => { //ext check
 
 });
 
-ipcMain.handle("show-context-menu", (event, { type }) => {
+ipcMain.handle("show-context-menu", (event, { type, files }) => {
   let template = [];
 
   if (type === "single") {
 
     template = [
-      {
-        label: "▶ Reproducir canción",
-        click: () => {
-          event.sender.send("context-play-selected");
-        }
-      },
+      { label: "▶  Reproducir canción", click: () => event.sender.send("context-play-selected") },
       { type: "separator" },
-      {
-        label: "Opción de prueba (single)",
-        click: () => {
-          console.log("Menú contextual SINGLE");
-        }
-      }
+      { label: "Cambiar nombre", click: () => event.sender.send("context-menu-action", { type: "rename", files }) },
+      { label: "Copiar nombre", click: () => event.sender.send("context-menu-action", { type: "copyName", files }) },
+      { label: "Copiar ruta", click: () => event.sender.send("context-menu-action", { type: "copyPath", files }) },
+      { type: "separator" },
+      { label: "Mover a carpeta...", click: () => event.sender.send("context-menu-action", { type: "moveToFolder", files }) },
+      { label: "Mover a papelera", click: () => event.sender.send("context-menu-action", { type: "moveToTrash", files }) },
+      { label: "Deshacer último movimiento", click: () => event.sender.send("context-menu-action", { type: "undo" }) },
     ];
 
   } else if (type === "multiple") {
+
     template = [
-      {
-        label: "Opción de prueba (multiple)",
-        click: () => {
-          console.log("Menú contextual MULTIPLE");
-        }
-      }
+      { label: "Copiar nombres", click: () => event.sender.send("context-menu-action", { type: "copyNames", files }) },
+      { label: "Copiar rutas", click: () => event.sender.send("context-menu-action", { type: "copyPaths", files }) },
+      { type: "separator" },
+      { label: "Mover a carpeta...", click: () => event.sender.send("context-menu-action", { type: "moveToFolder", files }) },
+      { label: "Mover a papelera", click: () => event.sender.send("context-menu-action", { type: "moveToTrash", files }) },
+      { label: "Deshacer último movimiento", click: () => event.sender.send("context-menu-action", { type: "undo" }) },
     ];
+
   }
 
   const menu = Menu.buildFromTemplate(template);
   menu.popup(BrowserWindow.fromWebContents(event.sender));
 });
+
+// ----------------------------------------------------------
+// operacion de archivos
+// ----------------------------------------------------------
+
+ipcMain.handle("rename-file", async (event, { oldPath, newName }) => {
+  try {
+    const dir = path.dirname(oldPath);
+    const newPath = path.join(dir, newName);
+
+    // fs.renameSync(oldPath, newPath);
+
+    // Usamos la versión promisificada de rename
+    await fs.rename(oldPath, newPath);
+    console.log(oldPath);
+    console.log(newPath);
+
+    // Avisar al renderer que el archivo cambió
+    event.sender.send("file-renamed", { oldPath, newPath });
+    return { success: true };
+  } catch (err) {
+    console.error("Error renombrando archivo:", err);
+    return { success: false, error: err.message };
+  }
+});
+
+// ----------------------------------------------------------
+// default app functions
+// ----------------------------------------------------------
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 

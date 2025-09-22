@@ -308,3 +308,22 @@
 //     return [];
 //   }
 // });
+
+// renderer.js
+// cuando se renombra el archivo pero watchdog ya hace el trabajo
+// window.electronAPI.onFileRenamed(({ oldPath, newPath }) => {
+//   // Actualizar playlist
+//   const song = playlist.find(f => f.path === oldPath);
+//   if (song) {
+//     song.path = newPath;
+//     song.name = newPath.split(/[/\\]/).pop();
+//   }
+
+//   loadPlaylistFromArray(playlist); // vuelve a renderizar
+// });
+
+// preload.js
+// onFileRenamed: (callback) => {
+//   ipcRenderer.removeAllListeners("file-renamed");
+//   ipcRenderer.on("file-renamed", (_, payload) => callback(payload));
+// },

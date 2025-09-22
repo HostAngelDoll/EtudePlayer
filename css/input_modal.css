@@ -1,0 +1,37 @@
+#renameModal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  justify-content: center;
+  align-items: center;
+}
+
+.modal-content {
+  background: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  min-width: 300px;
+}
+
+#renameMessage {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+#renameInput {
+  width: 100%;
+  margin-top: 10px;
+}
+
+.modal-buttons {
+  margin-top: 15px;
+  text-align: right;
+}
+
+button {
+  margin-left: 10px;
+}

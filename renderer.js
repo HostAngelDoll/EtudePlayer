@@ -42,9 +42,10 @@ let pitchValue = 1.0;
 let audioContext = null; // Definir bandas del ecualizador
 let eqFilters = [];
 let mediaNode = null;
-let songPath = null; // 3let currentAudio = null;
+let songPath = null; // let currentAudio = null;
 let playlistCache = {};
 let isOpenFolder = false;
+let disableWatchdog = false;
 volumeLabel.textContent = `${volumeSlider.value}%`;
 document.title = originalTitle;
 
@@ -93,10 +94,9 @@ async function getAudioDurationSeconds(src) {
   });
 }
 
-
-// songsArray: array de strings (paths) o array de objetos {name, path}
-// cacheKey: string identificador para cache (ej: folderPath o 'xmas-all')
 async function loadPlaylistFromArray(songsArray, cacheKey, forceNext = false) {
+  // songsArray: array de strings (paths) o array de objetos {name, path}
+  // cacheKey: string identificador para cache (ej: folderPath o 'xmas-all')
   if (!Array.isArray(songsArray)) return;
 
   // generar cacheKey si no viene
@@ -170,11 +170,13 @@ async function loadPlaylistFromArray(songsArray, cacheKey, forceNext = false) {
 
   updatePlaylistUI();
   showProgressNotification('Carga completa', 1); // esto ocultará después si tu func lo hace
+  if (disableWatchdog) {
+    disableWatchdog = false;
+  }
 }
 
-
-// folderPath: string (ruta absoluta)
 async function loadPlaylistFromFolder(folderPath) {
+  // folderPath: string (ruta absoluta)
   if (!folderPath) return;
   // crear cacheKey = folderPath (asegurar string)
   const cacheKey = String(folderPath);
@@ -189,7 +191,6 @@ async function loadPlaylistFromFolder(folderPath) {
   await loadPlaylistFromArray(songsArray, cacheKey);
 }
 
-
 window.addEventListener('beforeunload', () => {
   try {
     localStorage.setItem('playlistCache', JSON.stringify(playlistCache));
@@ -198,7 +199,6 @@ window.addEventListener('beforeunload', () => {
     console.warn('No se pudo guardar playlistCache al cerrar:', e);
   }
 });
-
 
 function clearPlayingStyle() {
   // Seleccionamos todas las filas del tbody que tengan la clase "playing"
@@ -287,8 +287,11 @@ function updatePlaylistUI() {
       const newSelection = tbody.querySelectorAll("tr.selected");
       const type = newSelection.length > 1 ? "multiple" : "single";
 
+      // Paths de los archivos seleccionados
+      const files = Array.from(newSelection).map(r => r.dataset.path);
+
       // Llamar al menú contextual en main
-      window.electronAPI.showContextMenu({ type });
+      window.electronAPI.showContextMenu({ type, files });
     });
 
     tbody.appendChild(tr);
@@ -297,6 +300,7 @@ function updatePlaylistUI() {
   // ✅ Restaurar resaltado de la canción en curso tras refresh
   if (songPath) {
     clearPlayingStyle();
+    //const tbody = document.querySelector('#playlist tbody');
     const rows = tbody.querySelectorAll("tr");
     rows.forEach(row => {
       if (row.dataset.path === songPath) {
@@ -304,19 +308,7 @@ function updatePlaylistUI() {
       }
     });
   }
-
 }
-
-window.electronAPI.onContextPlaySelected(() => {
-  const tbody = document.querySelector("#playlist tbody");
-  const selectedRow = tbody.querySelector("tr.selected");
-  if (!selectedRow) return;
-
-  const index = parseInt(selectedRow.dataset.index, 10);
-  if (!isNaN(index)) {
-    playSong(index);
-  }
-});
 
 // ----------------------------------------------------------------------
 // playback state
@@ -437,49 +429,6 @@ function setActiveFolder(el) {
   activeFolderEl = el;
 }
 
-// carpetas de cada año
-window.electronAPI.onFolderUpdated(async (files, folderPath) => {
-  // Convertir a formato {name, path} si viene como string
-  const songsArray = files.map(f => (typeof f === 'string' ? { name: f.split(/[\\/]/).pop(), path: f } : f));
-
-  // Cargar playlist desde array (recalcula duración, ordena alfabéticamente, actualiza cache)
-  await loadPlaylistFromArray(songsArray, folderPath, true);
-
-  // Mostrar tooltip de notificación
-  if (!isOpenFolder) {
-    showProgressNotification(`La carpeta "${folderPath}" ha cambiado`, 1);
-  } else {
-    isOpenFolder = false;
-  }
-});
-
-// carpetas unidas (xmas)
-window.electronAPI.onPlaylistUpdated(async (payload) => {
-  if (!payload || !Array.isArray(payload.files)) return;
-
-  const folderKey = payload.folderPath || deriveFolderFromPath(payload.folderPath) || payload.folderPath;
-
-  // Forzar refresco: eliminar cache temporal para esa key
-  if (typeof folderKey === 'string') {
-    delete playlistCache[folderKey];
-    try { localStorage.setItem('playlistCache', JSON.stringify(playlistCache)); } catch (e) { }
-  }
-
-  // Mapear a {name,path}
-  const songsArray = payload.files.map(f => ({ name: f.split(/[\\/]/).pop(), path: f }));
-
-  // Cargar (recalcula duraciones para los no cacheados)
-  await loadPlaylistFromArray(songsArray, folderKey, true);
-
-  // Notificar al usuario (tooltip cerrable manualmente)
-  if (!isOpenFolder) {
-    showProgressNotification(`La carpeta "${payload.folderPath}" ha cambiado`, 1);
-  } else {
-    isOpenFolder = false;
-  }
-});
-
-
 // Cargar árbol y manejar clicks en nodos
 window.addEventListener('DOMContentLoaded', async () => {
 
@@ -535,7 +484,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
         isOpenFolder = true;
         window.electronAPI.selectFolder(node.path); // <- nueva función que vamos a exponer
-        
+
         node.loadedSongs = true; // marca que ya cargamos
         if (autoPlay && playlist.length > 0) playSong(0); // solo si el flag autoPlay está activo
       }
@@ -555,17 +504,12 @@ window.addEventListener('DOMContentLoaded', async () => {
 
           isOpenFolder = true;
           await loadPlaylistFromArray(songs, 'xmas-all'); // cacheKey claro 'xmas-all'
-
           window.electronAPI.selectXmas(node.path);
 
           if (autoPlay && playlist.length > 0) playSong(0);
-
-          
         });
       }
-
     });
-
     return li;
   }
 
@@ -887,6 +831,138 @@ function showProgressNotification(message, progress = 0) {
   }
 }
 
+// -------------------------------------------------------------------
+// file operations and watchdog
+// -------------------------------------------------------------------
+
+window.electronAPI.onFileRenamed(async ({ oldPath, newPath }) => {
+  disableWatchdog = true;
+  const song = playlist.find(f => f.path === oldPath);
+  const formated_name = getNameAndYear_forArray(newPath);
+  const pathFolder = newPath.substring(0, newPath.lastIndexOf('/'));
+
+  if (song) {
+    song.path = newPath;
+    song.name = formated_name;
+  }
+  playlist.sort((a, b) => a.name.localeCompare(b.name));
+
+  if (songPath === oldPath) {
+    document.title = formated_name;
+  }
+  loadPlaylistFromArray(playlist, pathFolder, true); // vuelve a renderizar
+});
+
+// carpetas de cada año
+window.electronAPI.onFolderUpdated(async (files, folderPath) => {
+  if (disableWatchdog) return;
+  // Convertir a formato {name, path} si viene como string
+  const songsArray = files.map(f => (typeof f === 'string' ? { name: f.split(/[\\/]/).pop(), path: f } : f));
+
+  // Cargar playlist desde array (recalcula duración, ordena alfabéticamente, actualiza cache)
+  await loadPlaylistFromArray(songsArray, folderPath, true);
+
+  // Mostrar tooltip de notificación
+  if (!isOpenFolder) {
+    showProgressNotification(`La carpeta "${folderPath}" ha cambiado`, 1);
+  } else {
+    isOpenFolder = false;
+  }
+});
+
+// carpetas unidas (xmas)
+window.electronAPI.onPlaylistUpdated(async (payload) => {
+  if (disableWatchdog) return;
+  
+  if (!payload || !Array.isArray(payload.files)) return;
+
+  const folderKey = payload.folderPath || deriveFolderFromPath(payload.folderPath) || payload.folderPath;
+
+  // Forzar refresco: eliminar cache temporal para esa key
+  if (typeof folderKey === 'string') {
+    delete playlistCache[folderKey];
+    try { localStorage.setItem('playlistCache', JSON.stringify(playlistCache)); } catch (e) { }
+  }
+
+  // Mapear a {name,path}
+  const songsArray = payload.files.map(f => ({ name: f.split(/[\\/]/).pop(), path: f }));
+
+  // Cargar (recalcula duraciones para los no cacheados)
+  await loadPlaylistFromArray(songsArray, folderKey, true);
+
+  // Notificar al usuario (tooltip cerrable manualmente)
+  if (!isOpenFolder) {
+    showProgressNotification(`La carpeta "${payload.folderPath}" ha cambiado`, 1);
+  } else {
+    isOpenFolder = false;
+  }
+});
+
+
+// --------------------------------------------------------------
+// context menu conections
+// --------------------------------------------------------------
+
+window.electronAPI.onContextPlaySelected(() => {
+  const tbody = document.querySelector("#playlist tbody");
+  const selectedRow = tbody.querySelector("tr.selected");
+  if (!selectedRow) return;
+
+  const index = parseInt(selectedRow.dataset.index, 10);
+  if (!isNaN(index)) {
+    playSong(index);
+  }
+});
+
+window.electronAPI.onContextMenuAction(async (action) => {
+  console.log("Acción de menú:", action);
+
+  if (action.type === "rename") {
+    const filePath = action.files[0]; // solo hay uno
+
+    // Extraer nombre y extensión
+    const currentName = filePath.split(/[/\\]/).pop();
+    const nameWithoutExtension = currentName.replace(/\.[^/.]+$/, ''); // Eliminar la extensión
+    const extension = currentName.slice(nameWithoutExtension.length); // Obtener la extensión
+
+    // Crear un dialogo básico con el nombre sin la extensión
+    const newNameWithoutExtension = await customPrompt("Renombrar archivo:", nameWithoutExtension);
+
+    if (newNameWithoutExtension && newNameWithoutExtension !== nameWithoutExtension) {
+      // Concatenar la extensión al nuevo nombre
+      const newName = newNameWithoutExtension + extension;
+
+      // Pedir al main que renombre
+      window.electronAPI.renameFile({ oldPath: filePath, newName });
+    }
+    return;
+  }
+
+  switch (action.type) {
+    case "copyName":
+      // copiar un nombre
+      break;
+    case "copyPath":
+      // copiar ruta
+      break;
+    case "moveToFolder":
+      // abrir dialog mover
+      break;
+    case "moveToTrash":
+      // mover a papelera
+      break;
+    case "undo":
+      // deshacer última operación
+      break;
+    // multiple
+    case "copyNames":
+      // maneja copiado de nombres
+      break;
+    case "copyPaths":
+      // manejar copia múltiple
+      break;
+  }
+});
 
 // ##########################################
 // next file -> index.html

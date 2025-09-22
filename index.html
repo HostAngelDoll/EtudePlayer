@@ -7,11 +7,13 @@
   <link rel="stylesheet" href="css/equalizer_ui.css">
   <link rel="stylesheet" href="css/playlist_ui.css">
   <link rel="stylesheet" href="css/progressbar.css">
+  <link rel="stylesheet" href="css/input_modal.css">
   <script src="wavesurfer.min.js"></script>
+  <script src="custom_modal.js"></script>
 </head>
 
 <body>
-  <h1>🎵 EtudePlayer</h1>
+  
 
   <div id="progressTooltip">
     <div id="progressMessage">Indexando...</div>
@@ -19,6 +21,20 @@
       <div id="progressFill"></div>
     </div>
   </div>
+
+  <!-- Modal cambiar nombre -->
+  <div id="renameModal">
+    <div class="modal-content">
+      <div id="renameMessage">Renombrar archivo:</div>
+      <input type="text" id="renameInput" />
+      <div class="modal-buttons">
+        <button id="renameCancel">Cancelar</button>
+        <button id="renameOk">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <h1>🎵 EtudePlayer</h1>
 
   <div id="controls">
     <button id="prevBtn">⏮️ Anterior</button>

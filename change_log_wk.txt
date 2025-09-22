@@ -36,37 +36,41 @@ List:
 
 ------------------------------------------------------------------------------------------------
 
+🟢 Funcionalidades en playlist en orden:
+  - ✅ Menu contextual
+  - Renombrado (dialogo y funciones)
+    - mecanismo de cambiar el nombre al archivo
+    - un dialog con un input para cambiar el nombre al archivo (botones ok y cancelar)
+  - Mover elementos (dialogo y funciones)
+  - Copiar nombres y rutas al portapapeles
+  - Guardar historial de movimientos para poder desahcer
+    - contar con logica para desahcer operaciones de archivo
+
 
 🟢 Menu conceptual para un solo elemento:
-  - Para menu contextual cuando hay un solo elemento y varios seleciconados:
+  - uno o mas elementos selecionados:
     - mover a carpeta (dialog futuro)
     - mover a papelera ("E:/_Exclude/l_reallydeleted")
+    - deshacer ultimo(s) movimientos(s) (tras mover, renombrar o desabilitar archivos)
 
-  - cuando esta un solo elemento seleccionado
-    - cambiar nombre 
+  - cuando esta un solo elemento seleccionado:
+    - play song
+    - renombrar
     - copiar nombre del archivo
     - copiar ruta de archivo
-    - deshacer ultimo(s) elemento(s) movidos(s) (tras mover archivos a papelera o a otras carpetas)
 
-  - cuando hay elementos multiples seleccionados
+  - cuando hay elementos multiples seleccionados:
     - copiar nombres de archivo
     - copiar rutas de archivo
-    - deshacer ultimo(s) elemento(s) movidos(s) (tras mover archivos a papelera o a otras carpetas)
 
-  - mecanismo de cambiar el nombre al archivo
-    - un dialog con un input para cambiar el nombre al archivo (botones ok y cancelar)
-    - despues la playlist se actualiza con el nuevo nombre en cuando apariencia como en el alamcenado de las playlist
-
-  - contar con logica para desahcer operaciones de archivo
-  
-
+    
 🟢 Ventana de dialogo para mover archivos:
   - habra un elemento primero y sera "./" para ir a carpeta arriba
   - otro llamado "/+" para agregar carpeta nueva y saldra un dialog para el nombre
   - debajo de la lista estan dos botones
     - mover
     - cancelar
-  - primero saldran una lista de las carpetas de año
+  - primero saldran una lista de las carpetas de año (desde 2004 hasta 2025 siendo el año de ahora o más bien todo el root)
   - elegir una carpeta de año
   - estaran las carpetas como:
     - XX. music.main
@@ -105,7 +109,7 @@ List:
   - al haber movido o haber quitado una cancion se actualiza la playlist
   - o haber cambios en las carpetas de las canciones tanto agregado como movimientos y eliminacion
   - aplica tambien para canciones de navidad al vigilar todas las carpetas
-
+  - tras cambiar nombre entonces la playlist se actualiza con el nuevo nombre en cuando apariencia como en el alamcenado de las playlist
 
 ------------------------------------------------------------------------------------------------
 
