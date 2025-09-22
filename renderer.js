@@ -849,6 +849,7 @@ window.electronAPI.onFileRenamed(async ({ oldPath, newPath }) => {
 
   if (songPath === oldPath) {
     document.title = formated_name;
+    songPath = newPath;
   }
   loadPlaylistFromArray(playlist, pathFolder, true); // vuelve a renderizar
 });
