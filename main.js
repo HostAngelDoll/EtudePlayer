@@ -76,7 +76,7 @@ function watchFolder(folderPath, opts = {}) {
   // opts = { type: 'single' | 'xmas', rootForXmas: baseRoot }
 
   if (watchers.has(folderPath)) {
-    try { watchers.get(folderPath).close(); } catch(e){}
+    try { watchers.get(folderPath).close(); } catch (e) { }
   }
 
   // Crear watcher
@@ -93,10 +93,18 @@ function watchFolder(folderPath, opts = {}) {
 
   // Función para notificar cambios (con debounce)
   let debounceTimer = null;
+
+  // const notifyChange = () => {
+  //   if (debounceTimer) clearTimeout(debounceTimer);
+  //   debounceTimer = setTimeout(async () => {
+  //     try {
+
   const notifyChange = () => {
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(async () => {
       try {
+        // Si hay supresión activa para esta carpeta, NO hacer nada
+        if (isSuppressed(folderPath)) return;
 
         if (opts.type === 'xmas') {
           // Re-armar lista combinada y enviarla
@@ -326,7 +334,7 @@ ipcMain.handle("show-context-menu", (event, { type, files }) => {
 });
 
 // ----------------------------------------------------------
-// operacion de archivos
+// Operacion de archivos
 // ----------------------------------------------------------
 
 ipcMain.handle("rename-file", async (event, { oldPath, newName }) => {
@@ -349,6 +357,172 @@ ipcMain.handle("rename-file", async (event, { oldPath, newName }) => {
     return { success: false, error: err.message };
   }
 });
+
+
+// ----------------------------------------------------------
+// Move / create-folder / move-tree
+// ----------------------------------------------------------
+
+const suppressedUntil = new Map(); // folderPath -> timestamp (ms)
+
+// Move helper (intento rename; si falla por EXDEV, copia+unlink)
+async function moveItem(src, dst) {
+  try {
+    await fs.rename(src, dst);
+    return;
+  } catch (err) {
+    // fallback cross-device
+    if (err && err.code === 'EXDEV') {
+      // Usando streams con fs.promises
+      const rs = fs.createReadStream(src);
+      const ws = fs.createWriteStream(dst);
+
+      return new Promise((resolve, reject) => {
+        rs.on('error', reject);
+        ws.on('error', reject);
+        ws.on('close', async () => {
+          try {
+            await fs.unlink(src);
+            resolve();
+          } catch (e) { reject(e); }
+        });
+        rs.pipe(ws);
+      });
+    }
+    throw err;
+  }
+}
+
+// Helper: set suppression for a set of folders durante ms milliseconds
+function setSuppressionForFolders(folders, ms = 2500) {
+  const until = Date.now() + ms;
+  for (const f of folders) suppressedUntil.set(f, until);
+}
+
+// Helper: check if a folder is currently suppressed
+function isSuppressed(folderPath) {
+  const until = suppressedUntil.get(folderPath);
+  if (!until) return false;
+  if (Date.now() > until) {
+    suppressedUntil.delete(folderPath);
+    return false;
+  }
+  return true;
+}
+
+
+// -------------------- move dialog / create folder / move files --------------------
+
+ipcMain.handle('get-move-tree', async (event, baseRootArg) => {
+  const baseRoot = baseRootArg || ROOT_YEARS_PATH;
+  const result = [];
+  try {
+    const yearDirs = await fs.readdir(baseRoot, { withFileTypes: true });
+    const years = yearDirs.filter(d => d.isDirectory() && /^\d{4}$/.test(d.name)).map(d => d.name);
+    for (const year of years) {
+      const yearPath = path.join(baseRoot, year);
+      const id = String(Number(year) - 2003).padStart(2, '0');
+      const candidateNames = [
+        `${id}. music.main`,
+        `${id}. music.registry.album.package`,
+        `${id}. music.registry.base`,
+        `${id}. music.theme`,
+        `${id}. music.xmas`
+      ];
+
+      const nodes = [];
+      for (const name of candidateNames) {
+        const nodePath = path.join(yearPath, name);
+        try {
+          await fs.access(nodePath);
+          // canCreate = false for .main, .registry.base, .xmas
+          const canCreate = !(name.endsWith('.main') || name.endsWith('.registry.base') || name.endsWith('.xmas'));
+          const childNode = { name, path: nodePath, canCreate, nodes: [] };
+
+          // if album.package or theme -> include subfolders (directories)
+          if (name.endsWith('album.package') || name.endsWith('music.theme')) {
+            try {
+              const subs = await fs.readdir(nodePath, { withFileTypes: true });
+              childNode.nodes = subs.filter(s => s.isDirectory()).map(s => ({ name: s.name, path: path.join(nodePath, s.name), canCreate: true, nodes: [] }));
+            } catch(e){}
+          }
+
+          nodes.push(childNode);
+        } catch (e) {
+          // ausencia -> ignorar
+        }
+      }
+
+      result.push({ year, path: yearPath, nodes });
+    }
+  } catch (err) {
+    console.error('Error construyendo move-tree:', err);
+  }
+  return result;
+});
+
+ipcMain.handle('create-folder', async (event, { parentPath, folderName }) => {
+  try {
+    // seguridad: no permitir crear dentro de .main / .registry.base / .xmas
+    const lower = parentPath.toLowerCase();
+    if (lower.endsWith('.music.main') || lower.endsWith('.music.registry.base') || lower.endsWith('.music.xmas')) {
+      return { success: false, error: 'Creación no permitida en esta carpeta' };
+    }
+    const newPath = path.join(parentPath, folderName);
+    await fs.mkdir(newPath);
+    return { success: true, path: newPath };
+  } catch (err) {
+    console.error('Error creando carpeta:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('move-files', async (event, { files, destPath }) => {
+  try {
+    if (!Array.isArray(files) || files.length === 0) {
+      return { success: false, error: 'No files provided' };
+    }
+
+    // determinar carpetas afectadas
+    const affected = new Set(files.map(f => path.dirname(f)));
+    affected.add(destPath);
+
+    // suprimir watchers en estas carpetas (duración proporcional)
+    const suppressMs = Math.max(2000, files.length * 300);
+    setSuppressionForFolders(Array.from(affected), suppressMs);
+
+    const moved = [];
+    const total = files.length;
+    for (let i = 0; i < total; i++) {
+      const src = files[i];
+      const filename = path.basename(src);
+      const dst = path.join(destPath, filename);
+      try {
+        await moveItem(src, dst);
+        moved.push({ oldPath: src, newPath: dst });
+        event.sender.send('move-progress', { current: i + 1, total, file: src, percent: Math.round(((i + 1) / total) * 100) });
+      } catch (err) {
+        console.error('Error moviendo archivo:', src, err);
+        event.sender.send('move-progress', { current: i + 1, total, file: src, error: err.message, percent: Math.round(((i + 1) / total) * 100) });
+      }
+    }
+
+    // Pequeña espera para asegurar que FS termine
+    setTimeout(() => {
+      // levantar supresión
+      for (const f of affected) suppressedUntil.delete(f);
+      // notificar al renderer que la operación terminó
+      event.sender.send('move-complete', { moved, affected: Array.from(affected) });
+    }, 300);
+
+    return { success: true, moved };
+  } catch (err) {
+    console.error('Error en move-files:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+
 
 // ----------------------------------------------------------
 // default app functions

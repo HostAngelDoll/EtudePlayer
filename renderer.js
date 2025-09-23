@@ -27,13 +27,18 @@ const eqContainer = document.getElementById('eqContainer');
 const sliders = eqContainer.querySelectorAll('input[type="range"]');
 const originalTitle = "EtudePlayer";
 
+
 // ---------------------------------------------------
 // inicializar
 // ---------------------------------------------------
 
+const ROOT_YEARS_PATH = "E:\\_Internal";
 const eqBands = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
 let wavesurfer = null;
 let previousVolume = 1;
+let currentVolume = 1;   // 0 a 1
+let defaultVol = 0.4;
+let isMuted = false;
 let currentSongIndex = -1; // let currentIndex = -1;
 let playlist = [];
 let autoPlay = false;
@@ -44,8 +49,11 @@ let eqFilters = [];
 let mediaNode = null;
 let songPath = null; // let currentAudio = null;
 let playlistCache = {};
-let isOpenFolder = false;
+let messageFromOpenByNode = false;
 let disableWatchdog = false;
+let currentOpenFolder = null; // ruta de la carpeta actualmente abierta en UI de move files
+let savedEqValues = JSON.parse(localStorage.getItem('eqValues') || '[]');
+if (savedEqValues.length !== eqBands.length) { savedEqValues = eqBands.map(() => 0); }
 volumeLabel.textContent = `${volumeSlider.value}%`;
 document.title = originalTitle;
 
@@ -355,13 +363,24 @@ function getNameAndYear_forArray(rawFileUrl) {
   return `${pathSubstring}. ${filename}`;
 }
 
-function playSong(index) { // Reproducir canción por índice
+// -----------------------------------------------------
+// Controles
+// -----------------------------------------------------
+
+
+async function playSong(index) { // Reproducir canción por índice
   if (playlist.length === 0) return;
+
+  function retrasar(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
   songPath = playlist[index].path || playlist[index]; // ruta absoluta
   currentSongIndex = index;
 
   initWaveform(songPath);
   wavesurfer.setVolume(volumeSlider.value / 100);
+  retrasar(1000);
   wavesurfer.play();
   updatePlaylistUI();
 
@@ -369,9 +388,27 @@ function playSong(index) { // Reproducir canción por índice
   document.title = getNameAndYear(songPath);
 }
 
-// -----------------------------------------------------
-// Controles
-// -----------------------------------------------------
+function stopSong() {
+  if (wavesurfer) {
+    wavesurfer.stop();
+    wavesurfer.seekTo(0);
+    document.title = originalTitle;
+    statusBar.textContent = originalTitle;
+    clearPlayingStyle();
+  }
+}
+
+function playSongBtn() {
+  if (!wavesurfer) return;
+  if (wavesurfer.isPlaying()) {
+    wavesurfer.pause();
+  } else {
+    wavesurfer.play();
+    document.title = getNameAndYear(songPath);
+    updatePlaylistUI();
+  }
+}
+
 
 prevBtn.addEventListener('click', () => {
   if (playlist.length === 0) return;
@@ -383,27 +420,6 @@ nextBtn.addEventListener('click', () => {
   if (playlist.length === 0) return;
   currentSongIndex = (currentSongIndex + 1) % playlist.length;
   playSong(currentSongIndex);
-});
-
-playPauseBtn.addEventListener('click', () => {
-  if (!wavesurfer) return;
-  if (wavesurfer.isPlaying()) {
-    wavesurfer.pause();
-  } else {
-    wavesurfer.play();
-    document.title = getNameAndYear(songPath);
-    updatePlaylistUI();
-  }
-});
-
-stopBtn.addEventListener('click', () => {
-  if (wavesurfer) {
-    wavesurfer.stop();
-    wavesurfer.seekTo(0);
-    document.title = originalTitle;
-    statusBar.textContent = originalTitle;
-    clearPlayingStyle();
-  }
 });
 
 copyBtn.addEventListener('click', () => {
@@ -418,6 +434,10 @@ copyBtn.addEventListener('click', () => {
   });
 });
 
+playPauseBtn.addEventListener('click', () => { playSongBtn(); });
+
+stopBtn.addEventListener('click', () => { stopSong(); });
+
 
 // ----------------------------------------------------------------------
 // Activity bar (folder)
@@ -427,6 +447,16 @@ function setActiveFolder(el) {
   if (activeFolderEl) activeFolderEl.classList.remove('active-folder');
   el.classList.add('active-folder');
   activeFolderEl = el;
+}
+
+function collapseAllNodes() {
+  const treeContainer = document.getElementById('tree');
+
+  // Quitar clase 'open' de todos los <li> que la tengan
+  treeContainer.querySelectorAll('li.open').forEach(li => li.classList.remove('open'));
+
+  // Opcional: desactivar cualquier nodo activo
+  treeContainer.querySelectorAll('li.active').forEach(li => li.classList.remove('active'));
 }
 
 // Cargar árbol y manejar clicks en nodos
@@ -480,9 +510,10 @@ window.addEventListener('DOMContentLoaded', async () => {
 
       // Si es carpeta de música, cargar canciones bajo demanda
       if (node.type === 'folder' && node.path) {
+        messageFromOpenByNode = true;
         await loadPlaylistFromFolder(node.path);
 
-        isOpenFolder = true;
+        // _setOpenFolder(node.path);
         window.electronAPI.selectFolder(node.path); // <- nueva función que vamos a exponer
 
         node.loadedSongs = true; // marca que ya cargamos
@@ -502,8 +533,9 @@ window.addEventListener('DOMContentLoaded', async () => {
             path: f // ruta completa
           }));
 
-          isOpenFolder = true;
+          messageFromOpenByNode = true;
           await loadPlaylistFromArray(songs, 'xmas-all'); // cacheKey claro 'xmas-all'
+          // _setOpenFolder('xmas-all');
           window.electronAPI.selectXmas(node.path);
 
           if (autoPlay && playlist.length > 0) playSong(0);
@@ -528,43 +560,60 @@ window.addEventListener('DOMContentLoaded', async () => {
 function updateVolumeUI(volume) {
   volumeSlider.value = Math.round(volume * 100);
   volumeLabel.textContent = `${volumeSlider.value}%`;
+  btnMute.textContent = isMuted ? 'Unmute' : 'Mute';
 }
 
-// evento de cambio
-volumeSlider.addEventListener('input', () => {
-  const vol = volumeSlider.value / 100;
-  if (wavesurfer) wavesurfer.setVolume(vol);
-  volumeLabel.textContent = `${volumeSlider.value}%`;
-});
-
-// Listener para mutear/desmutear
-btnMute.addEventListener('click', () => {
-  if (!wavesurfer) return;
-  if (wavesurfer.getVolume() > 0) {
-    previousVolume = wavesurfer.getVolume();
-    wavesurfer.setVolume(0);
-    btnMute.textContent = 'Unmute';
-  } else {
-    wavesurfer.setVolume(previousVolume || 1);
-    btnMute.textContent = 'Mute';
-  }
+// Listener para subir el volumen
+btnVolUp.addEventListener('click', () => {
+  currentVolume = Math.min(1, currentVolume + 0.1);
+  if (!isMuted) applyVolume();
+  updateVolumeUI(currentVolume);
 });
 
 // Listener para bajar el volumen
 btnVolDown.addEventListener('click', () => {
-  if (!wavesurfer) return;
-  let newVolume = Math.max(0, wavesurfer.getVolume() - 0.1);
-  wavesurfer.setVolume(newVolume);
-  updateVolumeUI(newVolume);
+  currentVolume = Math.max(0, currentVolume - 0.1);
+  if (!isMuted) applyVolume();
+  updateVolumeUI(currentVolume);
 });
 
-// Listener para subir el volumen
-btnVolUp.addEventListener('click', () => {
-  if (!wavesurfer) return;
-  let newVolume = Math.min(1, wavesurfer.getVolume() + 0.1);
-  wavesurfer.setVolume(newVolume);
-  updateVolumeUI(newVolume);
+// Mute / Unmute
+btnMute.addEventListener('click', () => {
+  if (!isMuted) {
+    previousVolume = volumeSlider.value / 100;
+    isMuted = true;
+    applyVolume();
+  } else {
+    isMuted = false;
+    currentVolume = previousVolume || defaultVol;
+    applyVolume();
+  }
+  updateVolumeUI(previousVolume);
 });
+
+// evento de cambio
+volumeSlider.addEventListener('input', () => {
+  currentVolume = volumeSlider.value / 100;
+  // Si estaba muted, desmuteamos al mover el slider
+  if (isMuted) {
+    isMuted = false;
+    btnMute.textContent = 'Mute';
+  }
+  // Aplicar el volumen a wavesurfer si existe
+  applyVolume();
+  // Actualizar label
+  volumeLabel.textContent = `${volumeSlider.value}%`;
+});
+
+// Aplica el volumen a Wavesurfer si existe
+function applyVolume() {
+  if (wavesurfer) {
+    wavesurfer.setVolume(isMuted ? 0 : currentVolume);
+  }
+}
+
+// Inicializa el slider al cargar
+updateVolumeUI(defaultVol);
 
 
 // ##########################################
@@ -602,12 +651,6 @@ pitchSlider.addEventListener('input', (e) => updatePitch(e.target.value));
 // input controla
 pitchInput.addEventListener('change', (e) => updatePitch(e.target.value));
 
-
-// Recuperar valores guardados o inicializar en 0
-let savedEqValues = JSON.parse(localStorage.getItem('eqValues') || '[]');
-if (savedEqValues.length !== eqBands.length) {
-  savedEqValues = eqBands.map(() => 0);
-}
 
 // Aplicar valores a sliders inmediatamente
 sliders.forEach((slider, i) => {
@@ -681,6 +724,10 @@ function initWaveform(audioPath) {
 
     wavesurfer.load(audioPath);
   }
+
+  updateVolumeUI(volumeSlider.value / 100);
+  currentVolume = volumeSlider.value / 100;
+
 
   wavesurfer.on('audioprocess', () => {
     const current = wavesurfer.getCurrentTime();
@@ -758,6 +805,7 @@ function initWaveform(audioPath) {
   });
 
   wavesurfer.on('play', () => {
+    wavesurfer.setVolume(isMuted ? 0 : currentVolume);
     const currentSong = playlist[currentSongIndex];
     if (currentSong) {
       statusBar.textContent = `Playing: ${currentSong.name}`;
@@ -864,17 +912,17 @@ window.electronAPI.onFolderUpdated(async (files, folderPath) => {
   await loadPlaylistFromArray(songsArray, folderPath, true);
 
   // Mostrar tooltip de notificación
-  if (!isOpenFolder) {
+  if (!messageFromOpenByNode) {
     showProgressNotification(`La carpeta "${folderPath}" ha cambiado`, 1);
   } else {
-    isOpenFolder = false;
+    messageFromOpenByNode = false;
   }
 });
 
 // carpetas unidas (xmas)
 window.electronAPI.onPlaylistUpdated(async (payload) => {
   if (disableWatchdog) return;
-  
+
   if (!payload || !Array.isArray(payload.files)) return;
 
   const folderKey = payload.folderPath || deriveFolderFromPath(payload.folderPath) || payload.folderPath;
@@ -892,10 +940,10 @@ window.electronAPI.onPlaylistUpdated(async (payload) => {
   await loadPlaylistFromArray(songsArray, folderKey, true);
 
   // Notificar al usuario (tooltip cerrable manualmente)
-  if (!isOpenFolder) {
+  if (!messageFromOpenByNode) {
     showProgressNotification(`La carpeta "${payload.folderPath}" ha cambiado`, 1);
   } else {
-    isOpenFolder = false;
+    messageFromOpenByNode = false;
   }
 });
 
@@ -916,6 +964,7 @@ window.electronAPI.onContextPlaySelected(() => {
 });
 
 window.electronAPI.onContextMenuAction(async (action) => {
+  if (!action || !action.type) return;
   console.log("Acción de menú:", action);
 
   if (action.type === "rename") {
@@ -939,16 +988,26 @@ window.electronAPI.onContextMenuAction(async (action) => {
     return;
   }
 
+  if (action.type === "moveToFolder"){
+    // action.files es array de paths
+    openMoveDialog(action.files);
+    return;
+  }
+
   switch (action.type) {
+    case "rename": {
+      break;
+    }
     case "copyName":
       // copiar un nombre
       break;
     case "copyPath":
       // copiar ruta
       break;
-    case "moveToFolder":
-      // abrir dialog mover
+    case "moveToFolder": {
+      // move to folder
       break;
+    }
     case "moveToTrash":
       // mover a papelera
       break;
@@ -963,6 +1022,316 @@ window.electronAPI.onContextMenuAction(async (action) => {
       // manejar copia múltiple
       break;
   }
+});
+
+
+// ---------------------------------------------------------------
+// move files opetations
+// ---------------------------------------------------------------
+
+// ----------------- Move dialog + progress handling (mejorado treeview) -----------------
+
+// Si customPrompt ya existe, lo usa. (No sobreescribe.)
+if (typeof customPrompt !== 'function') {
+  function customPrompt(message, defaultValue = "") {
+    return new Promise((resolve) => {
+      const v = window.prompt(message, defaultValue);
+      resolve(v);
+    });
+  }
+}
+
+let _moveSelectedFiles = [];
+let _moveTree = [];
+let _currentSelectedDest = null;
+const parentMap = {}; // path -> parentPath (construido al renderizar)
+
+const moveModal = document.getElementById('moveModal');
+const moveTreeRoot = document.getElementById('moveTreeRoot');
+const moveBtnUp = document.getElementById('moveBtnUp');
+const moveBtnNew = document.getElementById('moveBtnNew');
+const moveConfirmBtn = document.getElementById('moveConfirmBtn');
+const moveCancelBtn = document.getElementById('moveCancelBtn');
+
+function showMoveTooltip(message, percent = 0) {
+  const tip = document.getElementById('moveProgressTooltip');
+  const msg = document.getElementById('moveProgressMessage');
+  const fill = document.getElementById('moveProgressFill');
+  msg.textContent = message || 'Moviendo archivos...';
+  fill.style.width = `${Math.round(percent)}%`;
+  tip.style.display = 'block';
+}
+
+function hideMoveTooltip() {
+  const tip = document.getElementById('moveProgressTooltip');
+  tip.style.display = 'none';
+}
+
+// Construir nodo recursivo. Devuelve <li>
+function buildNodeElement(node, parentPath = null) {
+  const li = document.createElement('li');
+  li.dataset.path = node.path;
+  li.dataset.canCreate = node.canCreate ? '1' : '0';
+  li.dataset.hasChildren = (Array.isArray(node.nodes) && node.nodes.length > 0) ? '1' : '0';
+
+  // expander
+  const exp = document.createElement('span');
+  exp.className = 'expander';
+  exp.textContent = node.nodes && node.nodes.length > 0 ? '▶' : '';
+  li.appendChild(exp);
+
+  // label
+  const label = document.createElement('span');
+  label.className = 'label';
+  label.textContent = node.name;
+  li.appendChild(label);
+
+  // set parent map
+  if (parentPath) parentMap[node.path] = parentPath;
+
+  // click handlers
+  exp.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (node.nodes && node.nodes.length > 0) {
+      li.classList.toggle('expanded');
+      const childUl = li.querySelector('ul');
+      if (childUl) childUl.style.display = childUl.style.display === 'block' ? 'none' : 'block';
+    }
+  });
+
+  label.addEventListener('click', (e) => {
+    e.stopPropagation();
+    // seleccionar este nodo (visual)
+    moveTreeRoot.querySelectorAll('li').forEach(x => x.classList.remove('selected'));
+    li.classList.add('selected');
+    _currentSelectedDest = node.path;
+    // si tiene children: expandir (comodidad)
+    if (node.nodes && node.nodes.length > 0) {
+      li.classList.add('expanded');
+      const childUl = li.querySelector('ul');
+      if (childUl) childUl.style.display = 'block';
+    }
+  });
+
+  // children
+  if (Array.isArray(node.nodes) && node.nodes.length > 0) {
+    const childUl = document.createElement('ul');
+    childUl.style.display = 'none'; // start collapsed
+    for (const ch of node.nodes) {
+      const chEl = buildNodeElement(ch, node.path);
+      childUl.appendChild(chEl);
+    }
+    li.appendChild(childUl);
+  }
+
+  return li;
+}
+
+// Abrir diálogo con archivos seleccionados (array de paths)
+async function openMoveDialog(selectedFiles) {
+  _moveSelectedFiles = Array.from(selectedFiles || []);
+  _moveTree = await window.electronAPI.getMoveTree();
+
+  // limpiar estructura auxiliar
+  parentMap = {}; // reinit - but parentMap declared const previously; instead reset keys:
+  Object.keys(parentMap).forEach(k => delete parentMap[k]);
+
+  moveTreeRoot.innerHTML = '';
+  _currentSelectedDest = null;
+
+  // Render por años, collapsed
+  for (const yearNode of _moveTree) {
+    const yearWrapper = document.createElement('div');
+    yearWrapper.style.marginBottom = '6px';
+
+    const header = document.createElement('div');
+    header.className = 'year-header';
+    header.textContent = yearNode.year;
+    header.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const yc = yearWrapper.querySelector('.year-children');
+      if (yc) yc.classList.toggle('open');
+    });
+    yearWrapper.appendChild(header);
+
+    const childrenContainer = document.createElement('div');
+    childrenContainer.className = 'year-children';
+    // build nodes under this year
+    if (Array.isArray(yearNode.nodes) && yearNode.nodes.length > 0) {
+      const ul = document.createElement('ul');
+      for (const n of yearNode.nodes) {
+        const li = buildNodeElement(n, yearNode.path);
+        ul.appendChild(li);
+      }
+      childrenContainer.appendChild(ul);
+    }
+    yearWrapper.appendChild(childrenContainer);
+    moveTreeRoot.appendChild(yearWrapper);
+  }
+
+  // show modal
+  moveModal.style.display = 'flex';
+  // scroll top
+  const container = document.getElementById('moveTreeContainer');
+  if (container) container.scrollTop = 0;
+}
+
+// Mover "Up" (./)
+moveBtnUp.addEventListener('click', (e) => {
+  if (!_currentSelectedDest) return;
+  const parent = parentMap[_currentSelectedDest];
+  if (!parent) return; // no parent
+  _currentSelectedDest = parent;
+  // visual highlight
+  moveTreeRoot.querySelectorAll('li').forEach(x => x.classList.remove('selected'));
+  const match = Array.from(moveTreeRoot.querySelectorAll('li')).find(li => li.dataset.path === parent);
+  if (match) {
+    match.classList.add('selected');
+    // ensure expanded ancestors are open
+    let p = match.parentElement;
+    while (p && p !== moveTreeRoot) {
+      if (p.classList && p.classList.contains('year-children') && !p.classList.contains('open')) p.classList.add('open');
+      if (p.tagName.toLowerCase() === 'li') {
+        p.classList.add('expanded');
+        const childUl = p.querySelector('ul');
+        if (childUl) childUl.style.display = 'block';
+      }
+      p = p.parentElement;
+    }
+  }
+});
+
+// Crear nueva carpeta (/+)
+moveBtnNew.addEventListener('click', async () => {
+  const targetParent = _currentSelectedDest || (_moveTree[0] && _moveTree[0].path) || null;
+  if (!targetParent) {
+    alert('Seleccione una carpeta destino o navega hacia una carpeta válida.');
+    return;
+  }
+
+  const lower = String(targetParent).toLowerCase();
+  if (lower.endsWith('.music.main') || lower.endsWith('.music.registry.base') || lower.endsWith('.music.xmas')) {
+    alert('No es posible crear carpetas dentro de esta carpeta.');
+    return;
+  }
+
+  const newName = await customPrompt('Nombre de la nueva carpeta:', 'Nueva carpeta');
+  if (!newName) return;
+
+  const res = await window.electronAPI.createFolder({ parentPath: targetParent, folderName: newName });
+  if (!res || !res.success) {
+    alert('Error creando carpeta: ' + (res && res.error ? res.error : 'desconocido'));
+    return;
+  }
+
+  // refrescar whole tree and expand parent
+  await openMoveDialog(_moveSelectedFiles);
+  // try to select new folder if exists
+  const createdPath = res.path;
+  const newEl = Array.from(moveTreeRoot.querySelectorAll('li')).find(li => li.dataset.path === createdPath);
+  if (newEl) {
+    newEl.classList.add('selected');
+    _currentSelectedDest = createdPath;
+  }
+});
+
+// Cancelar
+moveCancelBtn.addEventListener('click', () => {
+  moveModal.style.display = 'none';
+});
+
+// Confirmar mover
+moveConfirmBtn.addEventListener('click', async () => {
+  if (!_currentSelectedDest) {
+    alert('Seleccione el destino donde mover los archivos.');
+    return;
+  }
+
+  // Stop playback if currently playing file is being moved
+  const playingPath = songPath;
+  const toMove = _moveSelectedFiles;
+  if (playingPath && toMove.includes(playingPath)) {
+    try { if (wavesurfer) wavesurfer.stop(); } catch (e) {}
+    songPath = null;
+    clearPlayingStyle();
+  }
+
+  // Quitar inmediatamente las entradas de la playlist UI para evitar glitches
+  playlist = playlist.filter(p => !toMove.includes(p.path));
+  updatePlaylistUI();
+
+  disableWatchdog = true;
+
+  const resp = await window.electronAPI.moveFiles({ files: toMove, destPath: _currentSelectedDest });
+  if (resp && resp.success === false) {
+    alert('Error iniciando operación de movida: ' + (resp.error || 'desconocido'));
+    disableWatchdog = false;
+    return;
+  }
+
+  moveModal.style.display = 'none';
+});
+
+// recibir progreso y fin (ya lo tienes definidos antes, los dejamos iguales)
+window.electronAPI.onMoveProgress((payload) => {
+  const msg = payload && payload.file ? `Moviendo: ${payload.file}` : 'Moviendo archivos...';
+  const pct = payload && payload.percent ? payload.percent : 0;
+  showMoveTooltip(msg, pct);
+});
+
+window.electronAPI.onMoveComplete(async (payload) => {
+  hideMoveTooltip();
+  disableWatchdog = false;
+  // same logic you already had: actualizar playlistCache, recargar UI si necesario, notificar
+  if (!payload || !Array.isArray(payload.moved)) {
+    showProgressNotification('Movida completada', 1);
+    return;
+  }
+
+  const moved = payload.moved;
+  const bySrc = {};
+  const byDst = {};
+  moved.forEach(m => {
+    const src = m.oldPath.substring(0, m.oldPath.lastIndexOf('\\'));
+    const dst = m.newPath.substring(0, m.newPath.lastIndexOf('\\'));
+    bySrc[src] = bySrc[src] || [];
+    bySrc[src].push(m.oldPath);
+    byDst[dst] = byDst[dst] || [];
+    byDst[dst].push(m.newPath);
+  });
+
+  // Eliminar entradas del cache de origen
+  for (const src of Object.keys(bySrc)) {
+    if (playlistCache[src]) {
+      playlistCache[src] = playlistCache[src].filter(entry => !bySrc[src].includes(entry.path));
+    }
+  }
+
+  // Agregar entradas a cache destino (si existe)
+  for (const dst of Object.keys(byDst)) {
+    const additions = byDst[dst].map(p => {
+      return { name: getNameAndYear_forArray(p), path: p, duration: '0:00' };
+    });
+    if (playlistCache[dst]) {
+      playlistCache[dst] = playlistCache[dst].concat(additions);
+      playlistCache[dst].sort((a,b) => a.name.localeCompare(b.name));
+    } else {
+      playlistCache[dst] = additions;
+    }
+  }
+
+  try { localStorage.setItem('playlistCache', JSON.stringify(playlistCache)); } catch(e){ console.warn('No se pudo guardar playlistCache'); }
+
+  // refrescar UI si la carpeta actual fue afectada
+  const currentFolderKey = deriveFolderFromPath(playlist[0] && playlist[0].path);
+  if (currentFolderKey && (bySrc[currentFolderKey] || byDst[currentFolderKey])) {
+    if (playlistCache[currentFolderKey]) {
+      playlist = playlistCache[currentFolderKey];
+      updatePlaylistUI();
+    }
+  }
+
+  showProgressNotification('Movida completada', 1);
 });
 
 // ##########################################
