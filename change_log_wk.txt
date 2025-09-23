@@ -42,7 +42,8 @@ List:
     - mecanismo de cambiar el nombre al archivo
     - un dialog con un input para cambiar el nombre al archivo (botones ok y cancelar)
 
-  - Mover elementos (dialogo y funciones)
+  - ‼️ Mover elementos (dialogo y funciones) (alta difiultad en implementar)
+
   - Copiar nombres y rutas al portapapeles
   - Guardar historial de movimientos para poder desahcer
     - contar con logica para desahcer operaciones de archivo
