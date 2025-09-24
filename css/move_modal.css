@@ -1,0 +1,148 @@
+ /* Overlay */
+ .modal-overlay {
+     position: fixed;
+     inset: 0;
+     background: rgba(0, 0, 0, 0.5);
+     display: none;
+     align-items: center;
+     justify-content: center;
+     z-index: 9999;
+ }
+
+ /* Modal box */
+ .move-modal {
+     width: 720px;
+     max-height: 80vh;
+     background: #ffffff;
+     border-radius: 10px;
+     padding: 16px;
+     box-sizing: border-box;
+     display: flex;
+     flex-direction: column;
+     overflow: hidden;
+     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+ }
+
+ .move-modal .modal-header {
+     display: flex;
+     align-items: center;
+     justify-content: space-between;
+     gap: 8px;
+     margin-bottom: 8px;
+ }
+
+ .move-modal .modal-header strong {
+     font-size: 1.05rem;
+ }
+
+ .move-modal .close-btn {
+     background: transparent;
+     border: none;
+     font-size: 1.1rem;
+     cursor: pointer;
+ }
+
+ .move-modal .modal-topbar {
+     display: flex;
+     align-items: center;
+     justify-content: space-between;
+     margin-bottom: 8px;
+     gap: 8px;
+ }
+
+ .move-modal .modal-topbar .left-controls {
+     display: flex;
+     gap: 8px;
+ }
+
+ .move-modal button.control {
+     padding: 6px 10px;
+     border-radius: 6px;
+     border: 1px solid #cccccc;
+     background: #f6f6f6;
+     cursor: pointer;
+     font-weight: 600;
+ }
+
+ .move-modal .current-path {
+     color: #666;
+     font-size: 0.85rem;
+     white-space: nowrap;
+     overflow: hidden;
+     text-overflow: ellipsis;
+     max-width: 50%;
+     text-align: right;
+ }
+
+ /* Tree area */
+ #moveTreeContainer {
+     flex: 1 1 auto;
+     overflow: auto;
+     border: 1px solid #eee;
+     padding: 8px;
+     border-radius: 6px;
+     background: #fafafa;
+ }
+
+ #moveTreeContainer ul {
+     list-style: none;
+     margin: 0;
+     padding-left: 12px;
+ }
+
+ .folder-item {
+     display: flex;
+     align-items: center;
+     gap: 8px;
+     padding: 6px 8px;
+     border-radius: 4px;
+     cursor: pointer;
+     user-select: none;
+ }
+
+ .folder-item:hover {
+     background: #f0f8ff;
+ }
+
+ .folder-item .toggle {
+     width: 14px;
+     text-align: center;
+     font-size: 12px;
+     opacity: 0.8;
+ }
+
+ .folder-item .label {
+     flex: 1 1 auto;
+     font-size: 0.95rem;
+ }
+
+ .folder-item.disabled {
+     opacity: 0.5;
+     cursor: not-allowed;
+ }
+
+ .folder-item.selected {
+     background-color: #e0f0ff;
+     border-left: 3px solid #007bff;
+ }
+
+ .modal-actions {
+     display: flex;
+     justify-content: flex-end;
+     gap: 8px;
+     margin-top: 10px;
+ }
+
+ .modal-actions button {
+     padding: 8px 12px;
+     border-radius: 6px;
+     border: 1px solid #bbb;
+     background: #fff;
+     cursor: pointer;
+     font-weight: 600;
+ }
+
+ .modal-actions button:disabled {
+     opacity: 0.45;
+     cursor: not-allowed;
+ }

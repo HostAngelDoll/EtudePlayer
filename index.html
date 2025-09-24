@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="css/equalizer_ui.css">
   <link rel="stylesheet" href="css/playlist_ui.css">
   <link rel="stylesheet" href="css/progressbar.css">
-  <link rel="stylesheet" href="css/input_modal.css">
+  <link rel="stylesheet" href="css/move_modal.css">
   <script src="wavesurfer.min.js"></script>
   <script src="custom_modal.js"></script>
 </head>
@@ -19,18 +19,6 @@
     <div id="progressMessage">Indexando...</div>
     <div id="progressBar">
       <div id="progressFill"></div>
-    </div>
-  </div>
-
-  <!-- Modal cambiar nombre -->
-  <div id="renameModal">
-    <div class="modal-content">
-      <div id="renameMessage">Renombrar archivo:</div>
-      <input type="text" id="renameInput" />
-      <div class="modal-buttons">
-        <button id="renameCancel">Cancelar</button>
-        <button id="renameOk">OK</button>
-      </div>
     </div>
   </div>
 
@@ -155,55 +143,35 @@
   <h2>Folder Bar</h2>
   <div id="tree"></div>
 
-  <!-- Move Dialog Modal (actualizado con treeview y cancel abajo) -->
-  <div id="moveModal"
-    style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; z-index:1000;">
-    <div
-      style="background:#fff; width:780px; max-height:80vh; overflow:auto; border-radius:8px; padding:12px; box-shadow:0 6px 30px rgba(0,0,0,0.4);">
-      <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
-        <button id="moveBtnUp" title="Subir carpeta">./</button>
-        <button id="moveBtnNew" title="Crear nueva carpeta">/+ Nuevo</button>
-        <div style="flex:1;"></div>
+  <!-- MOVE-TO-FOLDER MODAL -->
+  <div class="modal-overlay" id="moveModalOverlay" aria-hidden="true">
+    <div class="move-modal" role="dialog" aria-labelledby="moveModalTitle">
+      <div class="modal-header">
+        <strong id="moveModalTitle">Seleccionar carpeta destino</strong>
+        <button class="close-btn" id="moveModalCloseBtn" title="Cerrar">✖</button>
       </div>
 
-      <div id="moveTreeContainer"
-        style="border:1px solid #ddd; padding:8px; height:420px; overflow:auto; font-family:system-ui, monospace;">
-        <!-- Tree (llenado por renderer) -->
-        <div id="moveTreeRoot"></div>
+      <div class="modal-topbar">
+        <div class="left-controls">
+          <button class="control" id="btnUp">./</button>
+          <button class="control" id="btnNewFolder">/+</button>
+        </div>
+
+        <div class="current-path" id="moveCurrentPath" title="Ruta actual">E:\_Internal</div>
       </div>
 
-      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px;">
+      <!-- <div id="moveTreeContainer" aria-live="polite"> -->
+      <div id="moveTreeContainer">
+
+        <!-- árbol dinámico -->
+      </div>
+
+      <div class="modal-actions">
         <button id="moveCancelBtn">Cancelar</button>
-        <button id="moveConfirmBtn"
-          style="background:#0b74de; color:#fff; border:none; padding:6px 12px; border-radius:4px;">Mover</button>
+        <button id="moveConfirmBtn" disabled>Mover</button>
       </div>
     </div>
   </div>
-
-  <!-- Move progress tooltip (mantener igual) -->
-  <div id="moveProgressTooltip"
-    style="display:none; position:fixed; right:18px; bottom:18px; background:#222; color:#fff; padding:10px; border-radius:6px; z-index:1100;">
-    <div id="moveProgressMessage">Moviendo archivos...</div>
-    <div style="width:260px; height:8px; background:#444; border-radius:4px; margin-top:8px;">
-      <div id="moveProgressFill" style="width:0%; height:100%; background:#3fb; border-radius:4px;"></div>
-    </div>
-  </div>
-
-  <!-- Treeview minimal styles (puedes mover a tu CSS) -->
-  <style>
-    /* move dialog tree styles */
-    #moveTreeRoot ul { list-style:none; padding-left:14px; margin:4px 0; }
-    #moveTreeRoot li { padding:4px 6px; cursor:pointer; display:flex; align-items:center; gap:8px; user-select:none; }
-    #moveTreeRoot li .expander { width:16px; display:inline-block; text-align:center; transform-origin:50% 50%; transition: transform .12s; }
-    #moveTreeRoot li[data-has-children="1"] .expander { color: #666; }
-    #moveTreeRoot li.expanded > .expander { transform: rotate(90deg); }
-    #moveTreeRoot li .label { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    #moveTreeRoot li.selected { background:#e6f7ff; border-radius:4px; }
-    #moveTreeRoot .year-header { font-weight:700; padding:6px 4px; cursor:pointer; display:flex; align-items:center; gap:8px; }
-    #moveTreeRoot .year-children { display:none; margin-left:6px; border-left:1px dashed #eee; padding-left:6px; }
-    #moveTreeRoot .year-children.open { display:block; }
-  </style>
-
 
   <script src="renderer.js"></script>
 </body>

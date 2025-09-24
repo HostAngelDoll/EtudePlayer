@@ -66,27 +66,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on("file-renamed", (_, payload) => callback(payload));
   },
 
-  // Move dialog + move ops
-  getMoveTree: async (baseRoot) => {
-    try { return await ipcRenderer.invoke('get-move-tree', baseRoot); }
-    catch (e) { console.error('getMoveTree error', e); return []; }
-  },
+  // NEW: create folder
   createFolder: async (payload) => {
-    try { return await ipcRenderer.invoke('create-folder', payload); }
-    catch (e) { console.error('createFolder error', e); return { success: false, error: e.message }; }
-  },
-  moveFiles: async (payload) => {
-    try { return await ipcRenderer.invoke('move-files', payload); }
-    catch (e) { console.error('moveFiles error', e); return { success: false, error: e.message }; }
-  },
-  onMoveProgress: (callback) => {
-    ipcRenderer.removeAllListeners('move-progress');
-    ipcRenderer.on('move-progress', (event, payload) => callback(payload));
-  },
-  onMoveComplete: (callback) => {
-    ipcRenderer.removeAllListeners('move-complete');
-    ipcRenderer.on('move-complete', (event, payload) => callback(payload));
-  },
+    try {
+      return await ipcRenderer.invoke('create-folder', payload);
+    } catch (err) {
+      console.error('Error creando carpeta:', err);
+      return { success: false, error: err && err.message ? err.message : String(err) };
+    }
+  }, 
 
 });
 

@@ -36,13 +36,18 @@ List:
 
 ------------------------------------------------------------------------------------------------
 
+- desahcer movimientos:
+  - creacion de carpetas
+  - movida de archivos
+  - cambios de nombres
+
 🟢 Funcionalidades en playlist en orden:
   - ✅ Menu contextual
   - ✅ Renombrado (dialogo y funciones)
     - mecanismo de cambiar el nombre al archivo
     - un dialog con un input para cambiar el nombre al archivo (botones ok y cancelar)
 
-  - ‼️ Mover elementos (dialogo y funciones) (alta difiultad en implementar)
+  - ‼️ Mover elementos (dialogo y funciones) (alta difiultad en implementar por largo)
 
   - Copiar nombres y rutas al portapapeles
   - Guardar historial de movimientos para poder desahcer
@@ -180,3 +185,7 @@ Other Tools to unify EtudePlayer convert to Etude Studio:
 - Music Searcher (for player)
 - parafy_analityc.py
 - juego de ruido de colores en electron.js (herramienta separada)
+
+
+------------------------------------------------------------------------
+
