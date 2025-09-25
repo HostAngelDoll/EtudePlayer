@@ -30,6 +30,8 @@
 * Confirmar que no hay conflictos (por ejemplo, nombre duplicado en destino).
 * Preparar la lista de operaciones de movimiento (`[origen -> destino]` por archivo).
 
+en orden vamos a saber que entendistes para hacerte correcciones y decirte si procedes
+
 ------------------------------------------------------------------------
 
 ### 🔷 **ETAPA 3: Mover los archivos**
@@ -38,7 +40,7 @@
 
 **Tareas:**
 
-* Ejecutar `fs.promises.rename()` (o similar) por cada archivo.
+* Ejecutar movida de archivos a carpeta de destino.
 * Mostrar barra de progreso o tooltip mientras se realiza.
 * Manejar errores si alguno falla (no detener todo, pero notificar).
 * Si todo va bien, continuar a la siguiente etapa.
@@ -52,13 +54,14 @@
 **Tareas:**
 
 * Eliminar de la playlist los archivos que fueron movidos.
-* Actualizar la cache del sistema de archivos desde la nueva ubicación.
-* Evitar múltiples listeners disparándose al mismo tiempo.
+* Actualizar la cache de la carpeta actual de la playlist.
+* Evitar múltiples listeners disparándose al mismo tiempo (como el watcher).
 * Evitar glitches visuales en la UI y tooltip (usar throttling o desactivar temporalmente listeners si es necesario).
+* Mostrar tooltip o notificación "Archivos movidos correctamente".
 
 ------------------------------------------------------------------------
 
-### 🔷 **ETAPA 5: Notificación final**
+### 🔷 **ETAPA ¿5?: Notificación final (duplicado)**
 
 **Objetivo**: Notificar al usuario que la operación se completó correctamente.
 
@@ -70,7 +73,7 @@
 
 ------------------------------------------------------------------------
 
-### 🔷 **ETAPA 6: Historial y deshacer (opcional)**
+### 🔷 **ETAPA 5: Historial y deshacer (proponer un plan de como sera)**
 
 **Objetivo**: Guardar una copia de la operación y permitir deshacer.
 
@@ -81,6 +84,7 @@
 
 ------------------------------------------------------------------------
 
+
 ## ✅ RESUMEN DE ETAPAS PARA MOVER ARCHIVOS
 
 | Etapa | Descripción                                      |
@@ -89,7 +93,7 @@
 | **2** | Validación: reproducción, duplicados, conflictos |
 | **3** | Movimiento físico de archivos (fs)               |
 | **4** | Actualización de playlist y cache (sin glitches) |
-| **5** | Notificación al usuario                          |
-| **6** | Deshacer movimiento (opcional)                   |
+| **?** | Notificación al usuario                          |
+| **5** | Deshacer movimiento (opcional)                   |
 
 ---

@@ -1,5 +1,6 @@
 List: 
 
+// Te pasare a ti estos archivos [ "main.js", "preload.js", "renderer.js", "index.html" ];
 
 - ✅ Volume control and porcentague Volume
 - ✅ buttons Volume
@@ -36,24 +37,32 @@ List:
 
 ------------------------------------------------------------------------------------------------
 
-- desahcer movimientos:
-  - creacion de carpetas
-  - movida de archivos
-  - cambios de nombres
 
 🟢 Funcionalidades en playlist en orden:
   - ✅ Menu contextual
   - ✅ Renombrado (dialogo y funciones)
-    - mecanismo de cambiar el nombre al archivo
-    - un dialog con un input para cambiar el nombre al archivo (botones ok y cancelar)
+    - ✅ mecanismo de cambiar el nombre al archivo
+    - ✅ un dialog con un input para cambiar el nombre al archivo (botones ok y cancelar)
 
-  - ‼️ Mover elementos (dialogo y funciones) (alta difiultad en implementar por largo)
+  - ✅ Copiar nombres y rutas al portapapeles
 
-  - Copiar nombres y rutas al portapapeles
+  - Mover elementos
+    - ✅ dialogo de mover
+    - ✅ modificar nombre de carpetas en el dialogo
+    - ✅ verificacion antes de mover archivos
+    - mecanica para mover archivos 
+      - mover archivos a carpetas de destino
+      - quitar de la playlist lo que se movio
+
   - Guardar historial de movimientos para poder desahcer
-    - contar con logica para desahcer operaciones de archivo
+    - Contar con logica para desahcer operaciones de archivo
+    - Funcion para desahcer movimientos:
+      - creacion de carpetas
+      - movida de archivos
+      - cambios de nombres en los archivos
+      - cambios de nombres en las carpetas
 
-🟢 Quiero implementar lo de mover archivos: 
+🟢 Quiero implementar lo de mover archivos (experiencia): 
   - lógica para mover los archivos - ventana de diálogo personalizado para elegir las carpetas 
   - configurar tooltip para ver progreso de movida de archivos 
   - manejo de los cambios en la playlist si los archivo seleccionados dejan la carpeta lo cual es obvio que ocurra. 
@@ -64,7 +73,44 @@ List:
     - lo que escribo antes fueron de los varios reintentos de implentacion de codigo que te he pedido antes y fue frustrante ver esos bugs
 
 
-🟢 Ventana de dialogo para mover archivos:
+nota: ya vistes lo que ya esta implementado por lo tanto no reinventes la rueda, ok? piensa más tiempo porfa
+  
+* Actualizar la cache del sistema de archivos (carpeta actual de la playlist) desde la nueva ubicación.
+* Ejecutar `fs.promises.rename()` (o similar) por cada archivo.
+
+
+------------------------------------------------------------------------------------------------
+
+
+✅ Mejoras en la playlist:
+  - funcione como un listbox, poder selecionar uno o varios elementos
+  - debe poder tener 1 o más columnas
+  - habra 2 columnas: "nombre" y "duracion"
+  - al darle click a un elemento se seleciona
+  - doble click para reproducirlo y seleccionarlo
+  - estilo de seleccion de uno o más
+
+
+✅ Integracion del menu contextual de electron a los elementos de la playlist
+  - click derecho para ver un menu conceptual (vacio por ahora, listo para agregar cosas)
+  - habra 2 menus para un elemento seleccionado y otro para elementos multiples seleccionados
+  - elementos de prueba para comprobar funcionalidad, luego 
+
+
+✅ Cachear indexeado de carpetas y playlist, y notificacion de proceso de carpetas y playlist.
+  - Mostrar una notificacion tooltip en el lado inferior derecho con progressbar como en vscode para ver las operaciones de indexeado y actualizacion de carpetas y playlist, y mostrar tambien errores de la consola
+  - Cachear la exploracion de carpetas de años y contenidos a igual que las playlist para no esperar a que todo cargue mientras se van detecando cambios en playlist y carpetas de años mientras se inicia el programa, esa operacion se usara tambien cuando se detecten cambios.
+
+
+✅ Eventos de la playlist:
+  - ✅ al haber movido o haber quitado una cancion se actualiza la playlist
+  - ✅ o haber cambios en las carpetas de las canciones tanto agregado como movimientos y eliminacion
+  - ✅ aplica tambien para canciones de navidad al vigilar todas las carpetas
+  - ✅ tras cambiar nombre entonces la playlist se actualiza 
+    - con el nuevo nombre en cuando apariencia como en el alamcenado de las playlist
+
+
+✅ Ventana de dialogo para mover archivos:
   - Este es el diseño de la ventana de dialogo:
     - se usara el custom prompt que hice para renombrar, ahora se usara para la creacion de carpetas
     - se vera un cuadro de area donde sera un un treeview de las carpetas de años
@@ -91,56 +137,26 @@ List:
   - no habra mensaje de confirmacion si esta seguro, una vez dado click a mover, empezara a mover los archivos
   - tras la movida de archivos, lo que se movio desaparece de la playlist, se actualizara unicamente la cache y no puede haber más listeners de actualizacion ya que habra glicheos tanto en la playlist y como en la notificacion tooltip
 
-  nota: ya vistes lo que ya esta implementado por lo tanto no reinventes la rueda, ok?
-  - piensa más tiempo porfa
-  
-    
-
-------------------------------------------------------------------------------------------------
-
-
-✅ Mejoras en la playlist:
-  - funcione como un listbox, poder selecionar uno o varios elementos
-  - debe poder tener 1 o más columnas
-  - habra 2 columnas: "nombre" y "duracion"
-  - al darle click a un elemento se seleciona
-  - doble click para reproducirlo y seleccionarlo
-  - estilo de seleccion de uno o más
-
-
-✅ Integracion del menu contextual de electron a los elementos de la playlist
-  - click derecho para ver un menu conceptual (vacio por ahora, listo para agregar cosas)
-  - habra 2 menus para un elemento seleccionado y otro para elementos multiples seleccionados
-  - elementos de prueba para comprobar funcionalidad, luego 
-
-
-✅ Cachear indexeado de carpetas y playlist, y notificacion de proceso de carpetas y playlist.
-  - Mostrar una notificacion tooltip en el lado inferior derecho con progressbar como en vscode para ver las operaciones de indexeado y actualizacion de carpetas y playlist, y mostrar tambien errores de la consola
-  - Cachear la exploracion de carpetas de años y contenidos a igual que las playlist para no esperar a que todo cargue mientras se van detecando cambios en playlist y carpetas de años mientras se inicia el programa, esa operacion se usara tambien cuando se detecten cambios.
-
-
-✅ Eventos de la playlist:
-  - al haber movido o haber quitado una cancion se actualiza la playlist
-  - o haber cambios en las carpetas de las canciones tanto agregado como movimientos y eliminacion
-  - aplica tambien para canciones de navidad al vigilar todas las carpetas
-  - tras cambiar nombre entonces la playlist se actualiza con el nuevo nombre en cuando apariencia como en el alamcenado de las playlist
-
 
 ✅ Menu conceptual para un solo elemento:
-  - uno o mas elementos selecionados:
-    - mover a carpeta (dialog futuro)
+  - Uno o mas elementos selecionados:
+    - ✅ mover a carpeta (dialog futuro)
+    - ✅ verificacion antes de mover
+    - mover a carpeta (mecanismo)
     - mover a papelera ("E:/_Exclude/l_reallydeleted")
-    - deshacer ultimo(s) movimientos(s) (tras mover, renombrar o desabilitar archivos)
 
-  - cuando esta un solo elemento seleccionado:
-    - play song
-    - renombrar
-    - copiar nombre del archivo
-    - copiar ruta de archivo
+  - Deshacer ultimo(s) movimientos(s) (tras mover, renombrar o desabilitar archivos)
 
-  - cuando hay elementos multiples seleccionados:
-    - copiar nombres de archivo
-    - copiar rutas de archivo
+  - ✅ cuando esta un solo elemento seleccionado:
+    - ✅ play song
+    - ✅ renombrar
+    - ✅ copiar nombre del archivo
+    - ✅ copiar ruta de archivo
+
+  - ✅ cuando hay elementos multiples seleccionados:
+    - ✅ copiar nombres de archivo
+    - ✅ copiar rutas de archivo
+
 
 
 ------------------------------------------------------------------------------------------------

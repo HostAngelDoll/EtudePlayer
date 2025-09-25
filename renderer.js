@@ -1,7 +1,7 @@
 // ##########################################
 // Advertencia: 
 // No tener todas las partes del renderer.js significa no poder hacerle juicio hasta que este entrgeado
-// renderer.js // part-1 to 3
+// renderer.js // part-1 to 4
 // ##########################################
 
 const playlistDiv = document.getElementById('playlist');
@@ -34,6 +34,11 @@ const originalTitle = "EtudePlayer";
 
 const ROOT_YEARS_PATH = "E:\\_Internal";
 const eqBands = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+const moveTreeState = { // estado para preservar entre refreshes
+  expandedPaths: new Set(),
+  selectedPath: null
+};
+let filesWhileRenaming = []
 let wavesurfer = null;
 let previousVolume = 1;
 let currentVolume = 1;   // 0 a 1
@@ -59,7 +64,7 @@ document.title = originalTitle;
 
 
 // -----------------------------------------------
-// Modal move-to-folder state
+// Iniciating > Modal move-to-folder state
 // -----------------------------------------------
 let moveModalOverlay = null;
 let moveTreeContainer = null;
@@ -68,11 +73,10 @@ let btnUp = null;
 let btnNewFolder = null;
 let moveCancelBtn = null;
 let moveConfirmBtn = null;
-
 let modalTreeData = null; // la estructura entera para el modal
 let selectedMoveNode = null; // nodo seleccionado para mover
 let filesToMove = []; // rutas de archivos seleccionados para mover (cuando el modal se abre)
-
+let pendingMoveOperations = null; // al prepararse: array [{ src, dest }, ...]
 
 // -----------------------------------------------------
 // funciones de renderer
@@ -239,7 +243,7 @@ function clearPlayingStyle() {
 // Advertencia: 
 // No tener todas las partes del renderer.js significa no poder hacerle juicio hasta que este entrgeado
 
-// renderer.js // part-2 to 3
+// renderer.js // part-2 to 4
 // ##########################################
 
 
@@ -529,7 +533,6 @@ window.addEventListener('DOMContentLoaded', async () => {
         messageFromOpenByNode = true;
         await loadPlaylistFromFolder(node.path);
 
-        // _setOpenFolder(node.path);
         window.electronAPI.selectFolder(node.path); // <- nueva función que vamos a exponer
 
         node.loadedSongs = true; // marca que ya cargamos
@@ -551,7 +554,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
           messageFromOpenByNode = true;
           await loadPlaylistFromArray(songs, 'xmas-all'); // cacheKey claro 'xmas-all'
-          // _setOpenFolder('xmas-all');
+
           window.electronAPI.selectXmas(node.path);
 
           if (autoPlay && playlist.length > 0) playSong(0);
@@ -635,7 +638,7 @@ updateVolumeUI(defaultVol);
 // ##########################################
 // Advertencia: 
 // No tener todas las partes del renderer.js significa no poder hacerle juicio hasta que este entrgeado
-// renderer.js // part-3 to 3
+// renderer.js // part-3 to 4
 // ##########################################
 
 // ----------------------------------------------------------------
@@ -879,19 +882,30 @@ window.electronAPI.onScanProgress(({ current, total, message }) => {
   showProgressNotification(message, current / total);
 });
 
-function showProgressNotification(message, progress = 0) {
+function showProgressNotification(message, progress = 0, isError = false, timeout = 2500) {
   const tooltip = document.getElementById("progressTooltip");
   const msg = document.getElementById("progressMessage");
   const fill = document.getElementById("progressFill");
 
   msg.textContent = message;
   fill.style.width = `${Math.round(progress * 100)}%`;
+  if (!isError) {
+    tooltip.style.backgroundColor = "#1e1e1e";
+    tooltip.style.color = "#ccc"
+    fill.style.backgroundColor = "#0e70c0";
+
+  }
+  else if (isError) {
+    tooltip.style.backgroundColor = "#af0000ff";
+    tooltip.style.color = "#fff"
+    fill.style.backgroundColor = "#fff";
+  }
 
   tooltip.style.display = "block";
 
   // opcional: ocultar automáticamente cuando llegue al 100%
   if (progress >= 1) {
-    setTimeout(() => { tooltip.style.display = "none"; }, 2500);
+    setTimeout(() => { tooltip.style.display = "none"; }, timeout);
   }
 }
 
@@ -1006,6 +1020,7 @@ window.electronAPI.onContextMenuAction(async (action) => {
 
   if (action.type === "moveToFolder") {
     filesToMove = Array.isArray(action.files) ? action.files.slice() : [];
+    filesWhileRenaming = filesToMove;
     openMoveDialog(filesToMove);
     return;
   }
@@ -1025,12 +1040,6 @@ window.electronAPI.onContextMenuAction(async (action) => {
       navigator.clipboard.writeText(fp);
       break;
     }
-    case "moveToTrash":
-      // mover a papelera
-      break;
-    case "undo":
-      // deshacer última operación
-      break;
     case "copyNames":
       // copiar múltiples nombres // multiple
       if (Array.isArray(action.files) && action.files.length) {
@@ -1043,9 +1052,21 @@ window.electronAPI.onContextMenuAction(async (action) => {
         navigator.clipboard.writeText(action.files.join('\n'));
       }
       break;
+    case "moveToTrash":
+      // mover a papelera
+      break;
+    case "undo":
+      // deshacer última operación
+      break;
   }
 });
 
+
+// ##########################################
+// Advertencia: 
+// No tener todas las partes del renderer.js significa no poder hacerle juicio hasta que este entrgeado
+// renderer.js // part-4 to 4
+// ##########################################
 
 // ---------------------------------------------------------------
 // move files opetations
@@ -1054,46 +1075,80 @@ window.electronAPI.onContextMenuAction(async (action) => {
 
 // ----------------- Modal / Tree code ---------------------------
 
+// Utility: detectar si crear/renombrar está bloqueado (misma regla que en main)
+function isCreateBlockedNodePath(nodePath) {
+  if (!nodePath) return true;
+  const base = nodePath.toLowerCase();
+  return base.includes('music.main') || base.includes('music.registry.base') || base.includes('music.xmas');
+}
+
 /**
- * Util: detectar si una ruta o nodo está bloqueado para CREAR carpetas.
- * Reglas: no permitir crear dentro de *.music.main, *.music.registry.base, *.music.xmas
+ * "E:/_years/2004/01. folder" -> "01. folder"
+ * @param {*} _path 
+ * @returns First Level of the path
  */
-function isCreateBlocked(node, isCreating = false) {
+function processPath(_path) {
+  // Separar por backslash o slash dependiendo del sistema
+  const partes = _path.split(/[\\/]/);
+  const ultimaCarpeta = partes[partes.length - 1];
+
+  // Verificar si es un año válido
+  const año = parseInt(ultimaCarpeta);
+  const añoActual = new Date().getFullYear();
+
+  if (!isNaN(año) && año >= 2000 && año <= añoActual) {
+    return ultimaCarpeta;
+  } else {
+    return ultimaCarpeta;
+  }
+}
+
+/**
+ * "01. folder.example" -> "folder example"
+ * @param {*} folderName
+ * @returns name without prefix
+ */
+function removePrefixFolder(folderName) {
+  return folderName.replace(/^\d{2}\.\s/, '');
+}
+
+/**
+ * Decide si estas carpetas pueden tener subcarpetas creadas por etudeplayer
+ * @param {*} node 
+ * @param {*} isCreating 
+ * @param {*} isMenu 
+ * @returns A bolean value
+ */
+function isCreateBlocked(node, isCreating = false, isMenu = true) {
   if (!node || !node.path) return true; // sin path → no crear
-  const name = node.path.toLowerCase();
+  const name = removePrefixFolder(node.path.toLowerCase());
+
   const denidedNames = [
-    'music.main', 'music.registry.base', 'music.xmas',
+    'music.main', 'music.registry.base', 'music.xmas', '_Internal',
     ...Array.from({ length: 2025 - 2004 + 1 }, (_, i) => (2004 + i).toString())
   ];
 
-  if (isCreating && denidedNames.some(part => name.includes(part))) { return true; }
+  const cantTouchThis = [
+    '_Internal', ...Array.from({ length: 2025 - 2004 + 1 }, (_, i) => (2004 + i).toString())
+  ];
+
+  if ((isCreating && !isMenu) && denidedNames.some(part => name.includes(part))) {
+    return true;
+  } else if ((!isCreating && !isMenu) && cantTouchThis.some(part => name.includes(part))) {
+    return true;
+  }
+
   // también bloquear si node.type === 'xmas-all'
   if (node.type === 'xmas-all') return true;
   return false;
 }
 
-/** Valid selection for "Mover" (según tu especificación):
- * - Debe tener path
- * - No estar bloqueada (aquí hemos tomado la regla que indicaste)
- */
-function isValidMoveTarget(node) {
-  if (!node || !node.path) return false;
-  // Si existe el path pero su basename es un año (por ejemplo "2006") permitimos (se añadirá prefijo si se crea carpeta)
-  // Sin embargo según la especificación, no permitimos mover a nodos "sin path" o con bloqueo
-  if (isCreateBlocked(node)) return false;
-  return true;
-}
-
-/**
- * Abrir modal (opcionalmente con lista de archivos a mover)
- */
+/** Abrir modal (opcionalmente con lista de archivos a mover) */
 async function openMoveDialog(files = []) {
   // Elementos del DOM (sólo una vez)
   moveModalOverlay = document.getElementById('moveModalOverlay');
   moveTreeContainer = document.getElementById('moveTreeContainer');
   moveCurrentPathEl = document.getElementById('moveCurrentPath');
-  btnUp = document.getElementById('btnUp');
-  btnNewFolder = document.getElementById('btnNewFolder');
   moveCancelBtn = document.getElementById('moveCancelBtn');
   moveConfirmBtn = document.getElementById('moveConfirmBtn');
 
@@ -1101,13 +1156,13 @@ async function openMoveDialog(files = []) {
 
   // Mostrar overlay
   moveModalOverlay.style.display = 'flex';
-  // moveModalOverlay.removeAttribute('inert');//.setAttribute('aria-hidden', 'false');
+  moveModalOverlay.removeAttribute('aria-hidden');
+  moveModalOverlay.removeAttribute('inert');
 
   moveConfirmBtn.disabled = true;
   selectedMoveNode = null;
 
-  // Cargar estructura desde main (getPlaylists)
-  const data = await window.electronAPI.getPlaylists();
+  const data = await window.electronAPI.getPlaylists(); // Cargar estructura desde main (getPlaylists)
 
   // Construimos un árbol "root" con años
   const rootNodes = (data.playlists || []).map(y => ({
@@ -1118,9 +1173,7 @@ async function openMoveDialog(files = []) {
   }));
 
   // agregar nodo Xmas al final
-  if (data.xmas) {
-    rootNodes.push(data.xmas);
-  }
+  if (data.xmas) { rootNodes.push(data.xmas);}
 
   modalTreeData = {
     name: 'root',
@@ -1128,115 +1181,75 @@ async function openMoveDialog(files = []) {
     path: ROOT_YEARS_PATH,
     nodes: rootNodes
   };
-
-  // Renderizar el árbol
-  renderMoveTree(modalTreeData);
-
-  // Setear ruta actual visual
-  moveCurrentPathEl.textContent = ROOT_YEARS_PATH;
-
-  // Eventos del modal
-  document.getElementById('moveModalCloseBtn').onclick = closeMoveDialog;
+  
+  renderMoveTree(modalTreeData); // Renderizar el árbol
+  moveCurrentPathEl.textContent = ROOT_YEARS_PATH; // Setear ruta actual visual
+  document.getElementById('moveModalCloseBtn').onclick = closeMoveDialog; // Eventos del modal
   moveCancelBtn.onclick = closeMoveDialog;
 
-  btnUp.onclick = () => {
-    if (!selectedMoveNode) return;
-    const parent = findParentNode(modalTreeData, selectedMoveNode.path);
-    if (parent) {
-      const el = findElementByPath(parent.path);
-      if (el) {
-        selectMoveNode(parent, el);
-        // actualizar ruta visual
-        moveCurrentPathEl.textContent = parent.path || ROOT_YEARS_PATH;
-      }
+  // move confirm
+  moveConfirmBtn.onclick = async (e) => {
+    e.stopPropagation();  // Evita que el evento clic siga propagándose
+
+    if (!selectedMoveNode || !selectedMoveNode.path) {
+      showProgressNotification('Selecciona una carpeta destino válida.', 1, true, 4000);
+      return;
     }
-  };
-
-  // Creating new folder
-  btnNewFolder.onclick = async (e) => {
-    // moveModalOverlay.setAttribute('inert', '');
-    const folderNameRaw = await customPrompt('Nombre de la nueva carpeta:'); // Nombre nuevo
-    // moveModalOverlay.removeAttribute('inert');
-
-    if (!folderNameRaw) return;
 
     const parentNode = selectedMoveNode || modalTreeData;
-    if (!parentNode || !parentNode.path) {
-      alert('Selecciona una carpeta válida donde crear la nueva carpeta.');
+    const folderSelected = removePrefixFolder(processPath(parentNode.path));
+
+    const cantTouchThis = [
+      '_Internal', 'music.registry.album.package',
+      ...Array.from({ length: 2025 - 2004 + 1 }, (_, i) => (2004 + i).toString())
+    ];
+    if (cantTouchThis.some(part => folderSelected.includes(part))) {
+      showProgressNotification('No se permite mover archivos a esta carpeta', 1, true, 5000)
+      return;
+    };
+
+    // El momento antes de mover de verdad los archivos
+    // filesWhileRenaming contiene las rutas seleccionadas para mover
+    const files = Array.isArray(filesWhileRenaming) && filesWhileRenaming.length ? filesWhileRenaming.slice() : filesToMove.slice();
+
+    // Validar y preparar
+    const res = await validateAndPrepareMove(files, selectedMoveNode.path);
+
+    if (!res || res.success === false) {
+      console.error('Preparación de movimiento fallida:', res && res.error);
       return;
     }
 
-    // validar bloqueo
-    if (isCreateBlocked(parentNode, true)) {
-      alert('No se permite crear carpetas en esta ubicación.');
-      return;
-    }
-
-    // Si el padre es un nodo "year", calcular prefijo XX.
-    let finalFolderName = folderNameRaw.trim();
-    if (parentNode.type === 'year') {
-      // parentNode.name contiene el año
-      const y = parseInt(parentNode.name, 10);
-      if (!isNaN(y)) {
-        const idx = String(y - 2003).padStart(2, '0');
-        finalFolderName = `${idx}. ${finalFolderName}`;
-      }
-    }
-
-    // llamar a main para crear carpeta
-    const res = await window.electronAPI.createFolder({ parentPath: parentNode.path, folderName: finalFolderName });
-    if (!res || !res.success) {
-      alert('No se pudo crear la carpeta: ' + (res && res.error ? res.error : 'Error desconocido'));
-      return;
-    }
-
-    // Recargar árbol (pedimos getPlaylists otra vez)
-    const data2 = await window.electronAPI.getPlaylists();
-    const rootNodes2 = (data2.playlists || []).map(y => ({
-      name: y.year,
-      type: 'year',
-      path: `${ROOT_YEARS_PATH}\\${y.year}`,
-      nodes: y.nodes || []
-    }));
-    if (data2.xmas) rootNodes2.push(data2.xmas);
-
-    modalTreeData = { name: 'root', type: 'root', path: ROOT_YEARS_PATH, nodes: rootNodes2 };
-    renderMoveTree(modalTreeData);
-
-    // seleccionar el nodo creado (buscamos por path)
-    const createdPath = res.path;
-    const createdEl = findElementByPath(createdPath);
-    if (createdEl) {
-      // obtener node object
-      const createdNode = findNodeByPath(modalTreeData, createdPath);
-      if (createdNode) selectMoveNode(createdNode, createdEl);
-    } else {
-      // fallback: nada
-    }
-
-    closeMoveDialog();
-    openMoveDialog();
-  };
-
-  // move confirm
-  moveConfirmBtn.onclick = (e) => {
-    e.stopPropagation();  // Evita que el evento clic siga propagándose
-    if (!selectedMoveNode || !selectedMoveNode.path) return;
-    // por ahora solo console.log como pediste
+    // Marca el botón como "preparado" (flag visual) — la etapa 3 ejecutará pendingMoveOperations
+    moveConfirmBtn.dataset.prepared = 'true';
+    moveConfirmBtn.textContent = '✔ Preparado';
+    moveConfirmBtn.disabled = false;
+    
+    // Seccion para mover archivos de verdad
     console.log('Mover a: "', selectedMoveNode.path, '" files:', filesToMove);
-    closeMoveDialog();
+
+    return; //por el momento para hacer pruebas finales
+
+    // Tras finalizar las operaciones
+    selectedMoveNode = null;
+    filesWhileRenaming = [];
+    filesToMove = []
+    closeMoveDialog(); //piden no cerrar pero por el momento es simulacion
   };
 }
 
-/** Cierra el modal */
+/** Cierra el modal de mover archivos */
 function closeMoveDialog() {
   const overlay = document.getElementById('moveModalOverlay');
   if (!overlay) return;
   overlay.style.display = 'none';
-  // overlay.setAttribute('inert', ''); //.setAttribute('aria-hidden', 'true');
+  overlay.setAttribute('aria-hidden', 'true');
+  overlay.setAttribute('inert', '');
+
+  const modal = document.getElementById('moveModalOverlay');
+  if (modal) { modal.removeAttribute('aria-hidden'); }
+
   // limpiar estado
-  selectedMoveNode = null;
-  filesToMove = [];
   moveConfirmBtn && (moveConfirmBtn.disabled = true);
   moveTreeContainer && (moveTreeContainer.innerHTML = '');
 }
@@ -1252,57 +1265,93 @@ function renderMoveTree(treeRoot) {
     li.dataset.type = node.type || 'folder';
     if (node.path) li.dataset.path = node.path;
 
-    // toggle (si tiene hijos)
+    // toggle (triángulo)
     const toggle = document.createElement('span');
     toggle.className = 'toggle';
     toggle.textContent = (node.nodes && node.nodes.length) ? '▸' : '';
     li.appendChild(toggle);
 
-    // label
+    // label (nombre de la carpeta)
     const label = document.createElement('span');
     label.className = 'label';
     label.textContent = node.name || (node.path ? node.path.split(/[\\/]/).pop() : '(no name)');
     li.appendChild(label);
 
-    // disabled style si no tiene path o si está bloqueado para crear
+    // visual disabled si no hay path
     if (!node.path) {
       li.classList.add('disabled');
     }
 
-    // click
-    li.addEventListener('click', (e) => {
-      e.stopPropagation();
-      // Si tiene hijos -> togglear expansión
-      if (node.nodes && node.nodes.length) {
-        // expandir/cerrar
-        const isOpen = li.getAttribute('data-open') === 'true';
-        li.setAttribute('data-open', (!isOpen).toString());
-        toggle.textContent = (!isOpen) ? '▾' : '▸';
-        // mostrar/ocultar contenedor de hijos
-        if (!isOpen) {
-          // crear hijos si no están
-          if (!li._childContainer) {
-            const c = document.createElement('div');
-            c.style.paddingLeft = '14px';
+    // Acción reutilizable: toggle open/close
+    li._toggleOpen = () => {
+      const isOpen = li.getAttribute('data-open') === 'true';
+      if (!isOpen) {
+        // abrir
+        li.setAttribute('data-open', 'true');
+        toggle.textContent = '▾';
+        if (node.path) moveTreeState.expandedPaths.add(node.path);
+
+        if (!li._childContainer) {
+          const c = document.createElement('div');
+          c.style.paddingLeft = '14px';
+          // crear hijos
+          if (node.nodes && node.nodes.length) {
             node.nodes.forEach(child => {
               c.appendChild(createNodeElement(child));
             });
-            li._childContainer = c;
-            li.appendChild(c);
-          } else {
-            li._childContainer.style.display = 'block';
           }
+          li._childContainer = c;
+          li.appendChild(c);
         } else {
-          if (li._childContainer) li._childContainer.style.display = 'none';
+          li._childContainer.style.display = 'block';
         }
+      } else {
+        // cerrar
+        li.setAttribute('data-open', 'false');
+        toggle.textContent = '▸';
+        if (node.path) moveTreeState.expandedPaths.delete(node.path);
+        if (li._childContainer) li._childContainer.style.display = 'none';
       }
+    };
 
-      // Si el nodo tiene path → seleccionar (si no está bloqueado)
-      if (node.path) {
-        // actualizar visual seleccionado
-        selectMoveNode(node, li);
-      }
+    // CLICK en la flechita -> solo toggle (no selecciona)
+    toggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      li._toggleOpen();
     });
+
+    // CLICK en la etiqueta -> select + toggle (si tiene hijos)
+    label.addEventListener('click', (e) => {
+      e.stopPropagation();
+      // primero expandir/colapsar si tiene subnodos
+      if (node.nodes && node.nodes.length) {
+        li._toggleOpen();
+      }
+      // luego seleccionar
+      selectMoveNode(node, li);
+    });
+
+    // CLICK en la zona del elemento (fallback) -> tratar como etiqueta (toggle + select)
+    li.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (e.target === toggle || e.target === label) return; // ya manejado
+      if (node.nodes && node.nodes.length) {
+        li._toggleOpen();
+      }
+      selectMoveNode(node, li);
+    });
+
+    // CONTEXTMENU (clic derecho) — *se añade sobre li, label y toggle* para evitar casos donde el evento no llegue.
+    const onCtx = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // Llamamos al preload -> main para mostrar el menu nativo.
+      // En main ya determinamos si las opciones van habilitadas/deshabilitadas.
+      window.electronAPI.showMoveContextMenu({ path: node.path });
+    };
+    li.addEventListener('contextmenu', onCtx);
+    label.addEventListener('contextmenu', onCtx);
+    toggle.addEventListener('contextmenu', onCtx);
 
     return li;
   }
@@ -1317,8 +1366,64 @@ function renderMoveTree(treeRoot) {
   moveTreeContainer.appendChild(rootWrapper);
 }
 
+/** Nueva función: obtener la cadena de ancestros (paths) desde root hasta targetPath */
+function getAncestorPathChain(root, targetPath) {
+  const chain = [];
+  let found = false;
+
+  function recurse(node, acc) {
+    if (found) return;
+    const newAcc = acc.slice();
+    if (node.path) newAcc.push(node.path);
+    if (node.path === targetPath) {
+      chain.push(...newAcc);
+      found = true;
+      return;
+    }
+    if (node.nodes && node.nodes.length) {
+      for (const c of node.nodes) {
+        recurse(c, newAcc);
+        if (found) return;
+      }
+    }
+  }
+
+  // root.nodes es array de top-level (años + xmas)
+  for (const top of modalTreeData.nodes || []) {
+    recurse(top, []);
+    if (found) break;
+  }
+  return chain; // array de paths (ordenado desde ancestro más alto a target)
+}
+
+// Expande en cadena: asegura que cada ancestro exista en DOM y esté expandido
+async function expandPathChain(chain) {
+  for (const p of chain) {
+    if (!p) continue;
+    const el = findElementByPath(p);
+    if (el) {
+      const isOpen = el.getAttribute('data-open') === 'true';
+      if (!isOpen) {
+        const toggle = el.querySelector('.toggle');
+        if (toggle) toggle.click(); // usa el handler que ya definimos
+        // esperar un poco para que los hijos se rendericen antes de ir al siguiente
+        await new Promise(r => setTimeout(r, 20));
+      }
+    }
+  }
+}
+
 /** Seleccionar visualmente un nodo dentro del modal */
 function selectMoveNode(node, el) {
+
+  function isValidMoveTarget(node) {
+    if (!node || !node.path) return false;
+    // Si existe el path pero su basename es un año (por ejemplo "2006") permitimos (se añadirá prefijo si se crea carpeta)
+    // Sin embargo según la especificación, no permitimos mover a nodos "sin path" o con bloqueo
+    if (isCreateBlocked(node, false, true)) return false;
+    return true;
+  }
+
   // remover seleccionado anterior
   const prev = moveTreeContainer.querySelector('.folder-item.selected');
   if (prev) prev.classList.remove('selected');
@@ -1333,7 +1438,7 @@ function selectMoveNode(node, el) {
   moveConfirmBtn.disabled = !allowed;
 
   // Si el nodo está bloqueado para creación, mostrar visual disabled (no impedir selección visualmente si el spec lo requiere)
-  if (isCreateBlocked(node)) {
+  if (isCreateBlocked(node, false)) {
     el && el.classList.add('disabled');
   } else {
     el && el.classList.remove('disabled');
@@ -1387,7 +1492,150 @@ function findNodeByPath(root, targetPath) {
   return found;
 }
 
+// GESTIÓN de acciones del menú nativo (main -> renderer)
+window.electronAPI.onMoveTreeAction(async (action) => {
+  if (!action || !action.type) return;
+  const { type, path: nodePath } = action;
+
+  if (type === 'createFolder') {
+    // prompt para nombre
+    closeMoveDialog();
+    const raw = await customPrompt('Nombre de la nueva carpeta:');
+    if (!raw) return;
+    let folderName = raw.trim();
+    if (!folderName) return;
+
+    // Si el parent es un nodo "year", aplicar prefijo XX.
+    // Intentamos inferir si nodePath es un YEAR folder (por ejemplo ...\2006)
+    const baseName = nodePath ? nodePath.split(/[\\/]/).pop() : '';
+    let finalName = folderName;
+    const yearNum = parseInt(baseName, 10);
+    if (!isNaN(yearNum) && yearNum > 1900 && yearNum < 3000) {
+      const idx = String(yearNum - 2003).padStart(2, '0');
+      finalName = `${idx}. ${folderName}`;
+    }
+
+    // Llamar a main para crear carpeta
+    const res = await window.electronAPI.createFolder({ parentPath: nodePath, folderName: finalName });
+    if (!res || !res.success) {
+      showProgressNotification('No se pudo crear la carpeta: ' + (res && res.error ? res.error : 'Error desconocido'), 1, true, 4000);
+      return;
+    }
+    openMoveDialog(filesWhileRenaming);
+    return;
+  }
+
+  if (type === 'renameFolder') {
+    if (!nodePath) return;
+    // sacar nombre actual
+    closeMoveDialog();
+    const currentBasename = nodePath.split(/[\\/]/).pop();
+    const newName = await customPrompt('Nuevo nombre de carpeta:', currentBasename);
+    if (!newName) return;
+    const result = await window.electronAPI.renameFolder({ oldPath: nodePath, newName: newName.trim() });
+    if (!result || !result.success) {
+      showProgressNotification('No se pudo renombrar: ' + (result && result.error ? result.error : 'Error'), 1, true, 4000);
+      return;
+    }
+    openMoveDialog(filesWhileRenaming);
+    return;
+  }
+});
+
 // ----------------- Fin del modal -----------------------------
+
+
+// Normalizar rutas para comparar (tolower + backslashes)
+function normalizePathForCompare(p) {
+  if (!p || typeof p !== 'string') return '';
+  return p.replace(/\//g, '\\').toLowerCase();
+}
+
+/**
+ * Validate & prepare move:
+ * - files: array de rutas absolutas (strings)
+ * - destPath: ruta de carpeta destino (string)
+ * Devuelve { success: true, operations } o { success:false, error }
+ */
+async function validateAndPrepareMove(files, destPath) {
+  // 1) comprobar input
+  if (!Array.isArray(files) || files.length === 0) {
+    // problema lógico: notificar por consola como pediste
+    console.error('validateAndPrepareMove: filesToMove está vacío. Abortando preparación.');
+    return { success: false, error: 'No files to move' };
+  }
+
+  // 2) comprobar destino existe (usamos IPC al main)
+  const destExists = await window.electronAPI.pathExists(destPath);
+  if (!destExists) {
+    showProgressNotification(`La carpeta de destino no existe: ${destPath}`, 1, true, 5000);
+    return { success: false, error: 'Destination does not exist' };
+  }
+
+  // 3) detener playback si alguno de los archivos está reproduciéndose
+  const normalizedSong = songPath ? normalizePathForCompare(songPath) : null;
+  if (normalizedSong) {
+    for (const f of files) {
+      if (normalizePathForCompare(f) === normalizedSong) {
+        // Detener playback y limpiar UI como pediste
+        try {
+          if (wavesurfer) wavesurfer.stop(); // detiene y resetea el cursor
+        } catch (e) { /* ignore */ }
+        clearPlayingStyle();
+        songPath = null;
+        statusBar.textContent = originalTitle;
+        break;
+      }
+    }
+  }
+
+  // 4) obtener nombres existentes en destino
+  const existing = await window.electronAPI.readFolderFiles(destPath);
+  if (existing === null) {
+    showProgressNotification(`Error accediendo a la carpeta destino: ${destPath}`, 1, true, 5000);
+    return { success: false, error: 'Cannot read destination folder' };
+  }
+
+  // Set con nombres en minúsculas para comparaciones (basename + ext)
+  const plannedLowerSet = new Set(existing.map(n => n.toLowerCase()));
+
+  // 5) construir operaciones respetando conflictos (basename + ext)
+  const operations = [];
+
+  for (const src of files) {
+    const basename = (typeof src === 'string') ? src.split(/[\\/]/).pop() : String(src);
+    // separa base y ext
+    const lastDot = basename.lastIndexOf('.');
+    const baseNoExt = lastDot >= 0 ? basename.substring(0, lastDot) : basename;
+    const ext = lastDot >= 0 ? basename.substring(lastDot) : '';
+
+    // generar nombre único si ya existe (base.ext, base (2).ext, base (3).ext, ...)
+    let candidate = basename;
+    let counter = 2;
+    while (plannedLowerSet.has(candidate.toLowerCase())) {
+      candidate = `${baseNoExt} (${counter})${ext}`;
+      counter++;
+    }
+
+    // reservar el nombre en el set (para conflictos entre múltiples archivos que movemos)
+    plannedLowerSet.add(candidate.toLowerCase());
+
+    // path destino final (Windows style, ya que tu proyecto usa backslashes)
+    const destFull = `${destPath}\\${candidate}`;
+
+    operations.push({ src, dest: destFull });
+  }
+
+  // Guardar resultado globalmente para ETAPA 3
+  pendingMoveOperations = operations;
+
+  // Notificar éxito (preparado)
+  showProgressNotification(`Preparadas ${operations.length} operaciones para mover.`, 1, false, 3500);
+  console.log('validateAndPrepareMove -> pendingMoveOperations:', operations);
+
+  return { success: true, operations };
+}
+
 
 
 // ##########################################

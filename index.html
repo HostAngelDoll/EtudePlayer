@@ -127,7 +127,6 @@
   </div>
 
   <h2>Playlist</h2>
-  <!-- <div id="playlist"></div> -->
   <table id="playlist" class="playlist">
     <thead>
       <tr>
@@ -144,34 +143,41 @@
   <div id="tree"></div>
 
   <!-- MOVE-TO-FOLDER MODAL -->
-  <div class="modal-overlay" id="moveModalOverlay" aria-hidden="true">
-    <div class="move-modal" role="dialog" aria-labelledby="moveModalTitle">
-      <div class="modal-header">
-        <strong id="moveModalTitle">Seleccionar carpeta destino</strong>
-        <button class="close-btn" id="moveModalCloseBtn" title="Cerrar">✖</button>
-      </div>
-
-      <div class="modal-topbar">
-        <div class="left-controls">
-          <button class="control" id="btnUp">./</button>
-          <button class="control" id="btnNewFolder">/+</button>
-        </div>
-
-        <div class="current-path" id="moveCurrentPath" title="Ruta actual">E:\_Internal</div>
-      </div>
-
-      <!-- <div id="moveTreeContainer" aria-live="polite"> -->
-      <div id="moveTreeContainer">
-
-        <!-- árbol dinámico -->
-      </div>
-
-      <div class="modal-actions">
-        <button id="moveCancelBtn">Cancelar</button>
-        <button id="moveConfirmBtn" disabled>Mover</button>
-      </div>
+  <div class="modal-overlay"
+     id="moveModalOverlay"
+     aria-hidden="true"
+     inert>
+     
+  <div class="move-modal"
+       role="dialog"
+       aria-modal="true"
+       aria-labelledby="moveModalTitle">
+       
+    <div class="modal-header">
+      <strong id="moveModalTitle">Seleccionar carpeta destino</strong>
+      <button class="close-btn" id="moveModalCloseBtn" title="Cerrar">✖</button>
     </div>
+
+    <div class="modal-topbar">
+      <!-- <div class="left-controls">
+        <button class="control" id="btnUp">./</button>
+        <button class="control" id="btnNewFolder">/+</button>
+      </div> -->
+      <div style="flex:1"></div>
+      <div class="current-path" id="moveCurrentPath" title="Ruta actual">E:\_Internal</div>
+    </div>
+
+    <div id="moveTreeContainer" aria-live="polite">
+      <!-- árbol dinámico -->
+    </div>
+
+    <div class="modal-actions">
+      <button id="moveCancelBtn">Cancelar</button>
+      <button id="moveConfirmBtn" disabled>Mover</button>
+    </div>
+
   </div>
+</div>
 
   <script src="renderer.js"></script>
 </body>

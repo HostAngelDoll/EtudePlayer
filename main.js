@@ -94,17 +94,13 @@ function watchFolder(folderPath, opts = {}) {
   // Función para notificar cambios (con debounce)
   let debounceTimer = null;
 
-  // const notifyChange = () => {
-  //   if (debounceTimer) clearTimeout(debounceTimer);
-  //   debounceTimer = setTimeout(async () => {
-  //     try {
-
   const notifyChange = () => {
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(async () => {
       try {
+
         // Si hay supresión activa para esta carpeta, NO hacer nada
-        if (isSuppressed(folderPath)) return;
+        // if (isSuppressed(folderPath)) return;
 
         if (opts.type === 'xmas') {
           // Re-armar lista combinada y enviarla
@@ -216,6 +212,13 @@ ipcMain.handle('get-playlists', async (event) => {
       await fs.access(themePath);
       const themeNodes = await getFolderNodes(themePath);
       nodes.push({ name: 'Theme', type: 'folder', path: themePath, nodes: themeNodes });
+    } catch { }
+
+    // Xmas por año
+    const xmasByYear = path.join(yearPath, `${prefix}. music.xmas`);
+    try {
+      await fs.access(xmasByYear);
+      nodes.push({ name: 'Xmas', type: 'folder', path: xmasByYear, nodes: [] });
     } catch { }
 
     playlists.push({ year, nodes });
@@ -346,8 +349,8 @@ ipcMain.handle("rename-file", async (event, { oldPath, newName }) => {
 
     // Usamos la versión promisificada de rename
     await fs.rename(oldPath, newPath);
-    console.log(oldPath);
-    console.log(newPath);
+    // console.log(oldPath);
+    // console.log(newPath);
 
     // Avisar al renderer que el archivo cambió
     event.sender.send("file-renamed", { oldPath, newPath });
@@ -361,6 +364,35 @@ ipcMain.handle("rename-file", async (event, { oldPath, newName }) => {
 // ----------------------------------------------------------
 // Create folder (from move dialog)
 // ----------------------------------------------------------
+
+// Mostrar menu contextual para nodos del modal move-tree
+ipcMain.handle('show-move-context-menu', (event, { path: nodePath }) => {
+  try {
+    // Si no hay path (ej: nodo 'Xmas' sin path real), deshabilitar opciones
+    const base = nodePath ? path.basename(nodePath).toLowerCase() : '';
+    const blocked = null; // !nodePath || base.includes('music.main') || base.includes('music.registry.base') || base.includes('music.xmas');
+
+    const template = [
+      {
+        label: '📂 Crear subcarpeta aquí',
+        // enabled: !blocked,
+        click: () => event.sender.send('move-tree-action', { type: 'createFolder', path: nodePath })
+      },
+      {
+        label: '✏️ Renombrar carpeta',
+        // enabled: !blocked,
+        click: () => event.sender.send('move-tree-action', { type: 'renameFolder', path: nodePath })
+      }
+    ];
+
+    const menu = Menu.buildFromTemplate(template);
+    menu.popup({ window: BrowserWindow.fromWebContents(event.sender) });
+    return true;
+  } catch (err) {
+    console.error('Error mostrando move-context-menu:', err);
+    return false;
+  }
+});
 
 ipcMain.handle('create-folder', async (event, { parentPath, folderName }) => {
   try {
@@ -388,6 +420,57 @@ ipcMain.handle('create-folder', async (event, { parentPath, folderName }) => {
     return { success: false, error: err.message || String(err) };
   }
 });
+
+ipcMain.handle('rename-folder', async (event, { oldPath, newName }) => {
+  try {
+    if (!oldPath || !newName) {
+      return { success: false, error: 'Parámetros inválidos' };
+    }
+    const dir = path.dirname(oldPath);
+    const newPath = path.join(dir, newName);
+
+    await fs.rename(oldPath, newPath);
+
+    // Enviar evento al renderer para quien corresponda
+    try {
+      event.sender.send('folder-renamed', { oldPath, newPath });
+    } catch (e) { /* ignore */ }
+
+    // Borrar cache para forzar re-index si lo deseas
+    try { await fs.unlink(CACHE_PATH); } catch (e) { /* ignore */ }
+
+    return { success: true, oldPath, newPath };
+  } catch (err) {
+    console.error('Error renombrando carpeta:', err);
+    return { success: false, error: err.message || String(err) };
+  }
+});
+
+
+// --------------------
+// Para mover archivos Utils IPC desde renderer (verificadores)
+// --------------------
+ipcMain.handle('path-exists', async (event, folderPath) => {
+  try {
+    if (!folderPath) return false;
+    await fs.access(folderPath);
+    return true;
+  } catch (e) {
+    return false;
+  }
+});
+
+ipcMain.handle('read-folder-files', async (event, folderPath) => {
+  try {
+    const entries = await fs.readdir(folderPath, { withFileTypes: true });
+    const files = entries.filter(e => e.isFile()).map(e => e.name);
+    return files; // array de nombres (strings) o [] si vacía
+  } catch (err) {
+    console.error('Error leyendo carpeta (read-folder-files):', err);
+    return null; // null indica error / no accesible
+  }
+});
+
 
 // ----------------------------------------------------------
 // Move / create-folder / move-tree

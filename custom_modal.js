@@ -1,8 +1,46 @@
-function customPrompt(message, defaultValue = "") {
+Object.defineProperty(window, 'alert', {
+  value: function() { console.error("alert bloqueado."); },
+  writable: false,
+  configurable: false,
+});
+
+Object.defineProperty(window, 'prompt', {
+  value: function() { console.error("prompt bloqueado."); return null; },
+  writable: false,
+  configurable: false,
+});
+
+Object.defineProperty(window, 'confirm', {
+  value: function() { console.error("confirm bloqueado."); return false; },
+  writable: false,
+  configurable: false,
+});
+
+/**
+ * Muestra un custom prompt con input OKCancel para sustituir Prompt() por bloqueo de ElectronJS
+ * @param {string} message 
+ * @param {string} defaultValue 
+ * @param {boolean} [isSecondary=false] solo si es un modal secundario
+ * @returns Regresa un nombre nuevo
+ */
+
+function customPrompt(message, defaultValue = "", isSecondary = false) {
   return new Promise((resolve) => {
     // Crear elementos del DOM
+    const mainOverlay = document.getElementById("moveModalOverlay");
+    
+    if (isSecondary) {
+      // 🔒 Desactivar el modal principal mientras el prompt está abierto
+      if (mainOverlay) {
+        mainOverlay.setAttribute("aria-hidden", "true");
+        mainOverlay.setAttribute("inert", ""); // desactiva interacción
+      }
+    }
 
     const modal = document.createElement("div");
+    modal.setAttribute("role", "dialog");
+    modal.setAttribute("aria-modal", "true");
+    modal.setAttribute("aria-label", message);
     modal.style.display = "flex";
     modal.style.position = "fixed";
     modal.style.top = "0";
@@ -19,16 +57,21 @@ function customPrompt(message, defaultValue = "") {
     content.style.padding = "20px";
     content.style.borderRadius = "8px";
     content.style.minWidth = "300px";
+    content.style.maxWidth = "90%";
+    content.style.outline = "none";
+    content.setAttribute("role", "document");
 
     const messageEl = document.createElement("div");
     messageEl.textContent = message;
     messageEl.style.fontSize = "16px";
     messageEl.style.fontWeight = "bold";
+    messageEl.id = "prompt-message";
 
     const input = document.createElement("input");
     input.type = "text";
     input.value = defaultValue;
     input.id = "inputNewString"
+    input.setAttribute("aria-labelledby", "prompt-message");
     input.style.pointerEvents = "auto";
     input.style.width = "100%";
     input.style.marginTop = "10px";
@@ -78,6 +121,12 @@ function customPrompt(message, defaultValue = "") {
       btnCancel.removeEventListener("click", onCancel);
       input.removeEventListener("keydown", onKey);
       document.body.removeChild(modal);
+
+      // ✅ Restaurar accesibilidad del modal principal
+      if (mainOverlay && isSecondary) {
+        mainOverlay.removeAttribute("aria-hidden");
+        mainOverlay.removeAttribute("inert");
+      }
     }
 
     function onOk() {

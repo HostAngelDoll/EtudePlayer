@@ -218,7 +218,7 @@ moveConfirmBtn.addEventListener('click', async () => {
   const playingPath = songPath;
   const toMove = _moveSelectedFiles;
   if (playingPath && toMove.includes(playingPath)) {
-    try { if (wavesurfer) wavesurfer.stop(); } catch (e) {}
+    try { if (wavesurfer) wavesurfer.stop(); } catch (e) { }
     songPath = null;
     clearPlayingStyle();
   }
@@ -281,13 +281,13 @@ window.electronAPI.onMoveComplete(async (payload) => {
     });
     if (playlistCache[dst]) {
       playlistCache[dst] = playlistCache[dst].concat(additions);
-      playlistCache[dst].sort((a,b) => a.name.localeCompare(b.name));
+      playlistCache[dst].sort((a, b) => a.name.localeCompare(b.name));
     } else {
       playlistCache[dst] = additions;
     }
   }
 
-  try { localStorage.setItem('playlistCache', JSON.stringify(playlistCache)); } catch(e){ console.warn('No se pudo guardar playlistCache'); }
+  try { localStorage.setItem('playlistCache', JSON.stringify(playlistCache)); } catch (e) { console.warn('No se pudo guardar playlistCache'); }
 
   // refrescar UI si la carpeta actual fue afectada
   const currentFolderKey = deriveFolderFromPath(playlist[0] && playlist[0].path);
@@ -303,7 +303,7 @@ window.electronAPI.onMoveComplete(async (payload) => {
 
 
 const save_us_preload = {
-    // Move dialog + move ops
+  // Move dialog + move ops
   getMoveTree: async (baseRoot) => {
     try { return await ipcRenderer.invoke('get-move-tree', baseRoot); }
     catch (e) { console.error('getMoveTree error', e); return []; }
@@ -409,7 +409,7 @@ ipcMain.handle('get-move-tree', async (event, baseRootArg) => {
             try {
               const subs = await fs.readdir(nodePath, { withFileTypes: true });
               childNode.nodes = subs.filter(s => s.isDirectory()).map(s => ({ name: s.name, path: path.join(nodePath, s.name), canCreate: true, nodes: [] }));
-            } catch(e){}
+            } catch (e) { }
           }
 
           nodes.push(childNode);
@@ -538,3 +538,386 @@ ipcMain.handle('move-files', async (event, { files, destPath }) => {
 //     #moveTreeRoot .year-children { display:none; margin-left:6px; border-left:1px dashed #eee; padding-left:6px; }
 //     #moveTreeRoot .year-children.open { display:block; }
 //   </style>
+
+
+// renderer.js 2025-09-24 discontinued
+
+/** Abrir modal (opcionalmente con lista de archivos a mover) */
+async function openMoveDialog(files = []) {
+  // Elementos del DOM (sólo una vez)
+  moveModalOverlay = document.getElementById('moveModalOverlay');
+  moveTreeContainer = document.getElementById('moveTreeContainer');
+  moveCurrentPathEl = document.getElementById('moveCurrentPath');
+  // btnUp = document.getElementById('btnUp');
+  // btnNewFolder = document.getElementById('btnNewFolder');
+  moveCancelBtn = document.getElementById('moveCancelBtn');
+  moveConfirmBtn = document.getElementById('moveConfirmBtn');
+
+  filesToMove = Array.isArray(files) ? files.slice() : [];
+
+  // Mostrar overlay
+  moveModalOverlay.style.display = 'flex';
+  moveModalOverlay.removeAttribute('aria-hidden');
+  moveModalOverlay.removeAttribute('inert');
+
+  moveConfirmBtn.disabled = true;
+  selectedMoveNode = null;
+
+  // Cargar estructura desde main (getPlaylists)
+  const data = await window.electronAPI.getPlaylists();
+
+  // Construimos un árbol "root" con años
+  const rootNodes = (data.playlists || []).map(y => ({
+    name: y.year,
+    type: 'year',
+    path: `${ROOT_YEARS_PATH}\\${y.year}`,
+    nodes: y.nodes || []
+  }));
+
+  // agregar nodo Xmas al final
+  if (data.xmas) {
+    rootNodes.push(data.xmas);
+  }
+
+  modalTreeData = {
+    name: 'root',
+    type: 'root',
+    path: ROOT_YEARS_PATH,
+    nodes: rootNodes
+  };
+
+  // Renderizar el árbol
+  renderMoveTree(modalTreeData);
+
+  // Setear ruta actual visual
+  moveCurrentPathEl.textContent = ROOT_YEARS_PATH;
+
+  // Eventos del modal
+  document.getElementById('moveModalCloseBtn').onclick = closeMoveDialog;
+  moveCancelBtn.onclick = closeMoveDialog;
+
+  // btnUp.onclick = () => {
+  //   if (!selectedMoveNode) return;
+  //   const parent = findParentNode(modalTreeData, selectedMoveNode.path);
+  //   if (parent) {
+  //     const el = findElementByPath(parent.path);
+  //     if (el) {
+  //       selectMoveNode(parent, el);
+  //       // actualizar ruta visual
+  //       moveCurrentPathEl.textContent = parent.path || ROOT_YEARS_PATH;
+  //     }
+  //   }
+  // };
+
+  // Creating new folder
+  // btnNewFolder.onclick = async (e) => {
+  //   e.stopPropagation();
+  //   const parentNode = selectedMoveNode || modalTreeData;
+  //   const folderSelected = removePrefixFolder(processPath(parentNode.path));
+
+  //   closeMoveDialog();
+  //   const folderNameRaw = await customPrompt('Nombre de la nueva carpeta:', '', false); // Nombre nuevo
+  //   if (!folderNameRaw) return;
+
+  //   if (!parentNode) {
+  //     showProgressNotification('Selecciona una carpeta válida donde crear la nueva carpeta.', 1, true, 3000)
+  //     return;
+  //   }
+
+  //   // No permitir carpetas de años ni raiz ni carpetas de registro y xmas
+  //   const cantTouchThis = [
+  //     '_Internal', 'music.main', 'music.xmas', 'music.registry.base',
+  //     ...Array.from({ length: 2025 - 2004 + 1 }, (_, i) => (2004 + i).toString())
+  //   ];
+
+  //   if (cantTouchThis.some(part => folderSelected.includes(part))) {
+  //     showProgressNotification('No se permite crear carpetas en esta ubicación.', 1, true, 3000)
+  //     return;
+  //   }
+
+  //   // Si el padre es un nodo "year", calcular prefijo XX.
+  //   let finalFolderName = folderNameRaw.trim();
+  //   if (parentNode.type === 'year') {
+  //     // parentNode.name contiene el año
+  //     const y = parseInt(parentNode.name, 10);
+  //     if (!isNaN(y)) {
+  //       const idx = String(y - 2003).padStart(2, '0');
+  //       finalFolderName = `${idx}. ${finalFolderName}`;
+  //     }
+  //   }
+
+  //   // llamar a main para crear carpeta
+
+  //   const res = await window.electronAPI.createFolder({
+  //     parentPath: parentNode.path, folderName: finalFolderName
+  //   });
+  //   if (!res || !res.success) {
+  //     showProgressNotification('No se pudo crear la carpeta: ' + (res && res.error ? res.error : 'Error desconocido'), 1, true, 3000)
+  //     return;
+  //   }
+
+  //   openMoveDialog();
+  // };
+
+  // move confirm
+  moveConfirmBtn.onclick = (e) => {
+    e.stopPropagation();  // Evita que el evento clic siga propagándose
+    if (!selectedMoveNode || !selectedMoveNode.path) return;
+
+    const parentNode = selectedMoveNode || modalTreeData;
+    const folderSelected = removePrefixFolder(processPath(parentNode.path));
+
+    const cantTouchThis = [
+      '_Internal', 'music.registry.album.package',
+      ...Array.from({ length: 2025 - 2004 + 1 }, (_, i) => (2004 + i).toString())
+    ];
+    if (cantTouchThis.some(part => folderSelected.includes(part))) {
+      showProgressNotification('No se permite mover archivos a esta carpeta', 1, true, 5000)
+      return;
+    };
+
+    // por ahora solo console.log como pediste
+    console.log('Mover a: "', selectedMoveNode.path, '" files:', filesToMove);
+
+    selectedMoveNode = null;
+    filesWhileRenaming = [];
+    filesToMove = []
+    closeMoveDialog();
+  };
+}
+
+function _old_createNodeElement(node) {
+  const li = document.createElement('div');
+  li.className = 'folder-item';
+  li.dataset.type = node.type || 'folder';
+  if (node.path) {
+    li.dataset.path = node.path;
+    console.log('Asignado path:', node.path);
+  } else {
+    console.log('Nodo sin path:', node);
+  }
+
+  // toggle (si tiene hijos)
+  const toggle = document.createElement('span');
+  toggle.className = 'toggle';
+  toggle.textContent = (node.nodes && node.nodes.length) ? '▸' : '';
+  li.appendChild(toggle);
+  if (node.nodes && node.nodes.length) {
+    console.log('Nodo con hijos:', node.nodes.length, 'hijos');
+  }
+
+  // label
+  const label = document.createElement('span');
+  label.className = 'label';
+  label.textContent = node.name || (node.path ? node.path.split(/[\\/]/).pop() : '(no name)');
+  li.appendChild(label);
+  console.log('Creado label:', label.textContent);
+
+  // disabled style si no tiene path o si está bloqueado para crear
+  if (!node.path) {
+    li.classList.add('disabled');
+    console.log('Nodo marcado como deshabilitado (sin path)');
+  }
+
+  // click
+  li.addEventListener('click', (e) => {
+    e.stopPropagation();
+    console.log('Click en nodo:', label.textContent);
+
+    // Si tiene hijos -> togglear expansión
+    if (node.nodes && node.nodes.length) {
+      const isOpen = li.getAttribute('data-open') === 'true';
+      li.setAttribute('data-open', (!isOpen).toString());
+      toggle.textContent = (!isOpen) ? '▾' : '▸';
+      console.log((!isOpen ? 'Expandiendo' : 'Colapsando') + ' nodo:', label.textContent);
+
+      // mostrar/ocultar contenedor de hijos
+      if (!isOpen) {
+        if (!li._childContainer) {
+          console.log('Creando contenedor de hijos para:', label.textContent);
+          const c = document.createElement('div');
+          c.style.paddingLeft = '14px';
+          node.nodes.forEach(child => {
+            console.log('Añadiendo hijo:', child.name || child.path);
+            c.appendChild(createNodeElement(child));
+          });
+          li._childContainer = c;
+          li.appendChild(c);
+        } else {
+          console.log('Mostrando contenedor existente de hijos para:', label.textContent);
+          li._childContainer.style.display = 'block';
+        }
+      } else {
+        if (li._childContainer) {
+          console.log('Ocultando contenedor de hijos para:', label.textContent);
+          li._childContainer.style.display = 'none';
+        }
+      }
+    }
+
+    // Si el nodo tiene path → seleccionar (si no está bloqueado)
+    if (node.path) {
+      console.log('Seleccionando nodo:', node.path);
+      selectMoveNode(node, li);
+    }
+  });
+
+  // CONTEXT MENU (clic derecho sobre nodo) -> invocar menú nativo en main
+  li.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    console.log('Click derecho en nodo (menú contextual):', node.path);
+    window.electronAPI.showMoveContextMenu({ path: node.path });
+  });
+
+  return li;
+}
+
+/** Función robusta: refrescar el modal tree sin cerrar el diálogo */
+async function refreshMoveTreePreservingState() {
+  if (!moveTreeContainer) return;
+  // Guardar estado actual
+  const prevExpanded = Array.from(moveTreeState.expandedPaths);
+  const prevSelected = moveTreeState.selectedPath;
+
+  // Reconsultar estructura
+  const data = await window.electronAPI.getPlaylists();
+
+  const rootNodes = (data.playlists || []).map(y => ({
+    name: y.year,
+    type: 'year',
+    path: `${ROOT_YEARS_PATH}\\${y.year}`,
+    nodes: y.nodes || []
+  }));
+  if (data.xmas) rootNodes.push(data.xmas);
+
+  modalTreeData = { name: 'root', type: 'root', path: ROOT_YEARS_PATH, nodes: rootNodes };
+
+  // Limpiar estado expandidos temporales y re-crear contenedor
+  moveTreeState.expandedPaths = new Set();
+  moveTreeState.selectedPath = null;
+  moveTreeContainer.innerHTML = '';
+
+  // Render inicial (todo colapsado)
+  const rootWrapper = document.createElement('div');
+  modalTreeData.nodes.forEach(yearNode => {
+    const el = createNodeElement(yearNode);
+    rootWrapper.appendChild(el);
+  });
+  moveTreeContainer.appendChild(rootWrapper);
+
+  // Reaplicar expansiones por cada expanded path guardado:
+  for (const ep of prevExpanded) {
+    if (!ep) continue;
+    const chain = getAncestorPathChain(modalTreeData, ep);
+    if (chain && chain.length) {
+      await expandPathChain(chain);
+      // marcar este ep como expandido en el estado
+      moveTreeState.expandedPaths.add(ep);
+    }
+  }
+
+  // Re-aplicar selección
+  if (prevSelected) {
+    const prevEl = findElementByPath(prevSelected);
+    if (prevEl) {
+      // seleccionar visualmente (sin cambiar expandedPaths)
+      const prev = moveTreeContainer.querySelector('.folder-item.selected');
+      if (prev) prev.classList.remove('selected');
+      prevEl.classList.add('selected');
+      const nodeObj = findNodeByPath(modalTreeData, prevSelected);
+      if (nodeObj) {
+        selectedMoveNode = nodeObj;
+        moveTreeState.selectedPath = prevSelected;
+        moveCurrentPathEl.textContent = prevSelected;
+        moveConfirmBtn.disabled = !(prevSelected && prevSelected.length > 0);
+      }
+    } else {
+      // si no existe (por ejemplo fue renombrado o eliminado), limpiar selección
+      selectedMoveNode = null;
+      moveTreeState.selectedPath = null;
+      moveConfirmBtn.disabled = true;
+    }
+  } else {
+    moveConfirmBtn.disabled = true;
+  }
+}
+
+// GESTIÓN de acciones del menú nativo (main -> renderer)
+window.electronAPI.onMoveTreeAction(async (action) => {
+  if (!action || !action.type) return;
+  const { type, path: nodePath } = action;
+
+  if (type === 'createFolder') {
+    // prompt para nombre
+    // closeMoveDialog();
+    const raw = await customPrompt('Nombre de la nueva carpeta:');
+    if (!raw) return;
+    let folderName = raw.trim();
+    if (!folderName) return;
+
+    // Si el parent es un nodo "year", aplicar prefijo XX.
+    // Intentamos inferir si nodePath es un YEAR folder (por ejemplo ...\2006)
+    const baseName = nodePath ? nodePath.split(/[\\/]/).pop() : '';
+    let finalName = folderName;
+    const yearNum = parseInt(baseName, 10);
+    if (!isNaN(yearNum) && yearNum > 1900 && yearNum < 3000) {
+      const idx = String(yearNum - 2003).padStart(2, '0');
+      finalName = `${idx}. ${folderName}`;
+    }
+
+    // Llamar a main para crear carpeta
+    const res = await window.electronAPI.createFolder({ parentPath: nodePath, folderName: finalName });
+    if (!res || !res.success) {
+      showProgressNotification('No se pudo crear la carpeta: ' + (res && res.error ? res.error : 'Error desconocido'), 1, true, 4000);
+      return;
+    }
+
+    // Refrescar el árbol en caliente y seleccionar la creada
+    await refreshMoveTreePreservingState();
+    // intentar seleccionar la creada
+    const createdPath = res.path;
+    if (createdPath) {
+      // expandir ancestros y seleccionar
+      const chain = getAncestorPathChain(modalTreeData, createdPath);
+      if (chain && chain.length) {
+        await expandPathChain(chain);
+      }
+      const createdEl = findElementByPath(createdPath);
+      if (createdEl) {
+        createdEl.click(); // selecciona (click se encarga)
+      }
+    }
+
+    // openMoveDialog(filesWhileRenaming);
+    return;
+  }
+
+  if (type === 'renameFolder') {
+    if (!nodePath) return;
+    // sacar nombre actual
+    // closeMoveDialog();
+    const currentBasename = nodePath.split(/[\\/]/).pop();
+    const newName = await customPrompt('Nuevo nombre de carpeta:', currentBasename);
+    if (!newName) return;
+    const result = await window.electronAPI.renameFolder({ oldPath: nodePath, newName: newName.trim() });
+    if (!result || !result.success) {
+      showProgressNotification('No se pudo renombrar: ' + (result && result.error ? result.error : 'Error'), 1, true, 4000);
+      return;
+    }
+
+    // Refrescar y seleccionar el nuevo path
+    await refreshMoveTreePreservingState();
+    const newPath = result.newPath || result.path;
+    if (newPath) {
+      // expandir ancestros y seleccionar newPath
+      const chain = getAncestorPathChain(modalTreeData, newPath);
+      if (chain && chain.length) {
+        await expandPathChain(chain);
+      }
+      const newEl = findElementByPath(newPath);
+      if (newEl) newEl.click();
+    }
+    // openMoveDialog(filesWhileRenaming);
+    return;
+  }
+});

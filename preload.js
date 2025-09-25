@@ -66,6 +66,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on("file-renamed", (_, payload) => callback(payload));
   },
 
+  // NEW: show context menu for move tree nodes
+  showMoveContextMenu: async (payload) => {
+    try {
+      return await ipcRenderer.invoke('show-move-context-menu', payload);
+    } catch (err) {
+      console.error('Error mostrando menu contexto moveTree:', err);
+      return null;
+    }
+  },
+
   // NEW: create folder
   createFolder: async (payload) => {
     try {
@@ -74,10 +84,48 @@ contextBridge.exposeInMainWorld('electronAPI', {
       console.error('Error creando carpeta:', err);
       return { success: false, error: err && err.message ? err.message : String(err) };
     }
-  }, 
+  },
+  // NEW: rename folder
+  renameFolder: async (payload) => {
+    try {
+      return await ipcRenderer.invoke('rename-folder', payload);
+    } catch (err) {
+      console.error('Error renombrando carpeta:', err);
+      return { success: false, error: err && err.message ? err.message : String(err) };
+    }
+  },
+  onFolderRenamed: (callback) => {
+    ipcRenderer.removeAllListeners('folder-renamed');
+    ipcRenderer.on('folder-renamed', (event, payload) => callback(payload));
+  },
+  // MAIN -> renderer: move-tree-action
+  onMoveTreeAction: (callback) => {
+    ipcRenderer.removeAllListeners('move-tree-action');
+    ipcRenderer.on('move-tree-action', (event, action) => callback(action));
+  },
+
+  // Comprobar existencia de ruta (true/false)
+  pathExists: async (path) => {
+    try {
+      return await ipcRenderer.invoke('path-exists', path);
+    } catch (err) {
+      console.error('pathExists error:', err);
+      return false;
+    }
+  },
+
+  // Leer todos los nombres de archivo de una carpeta (devuelve array o null si error)
+  readFolderFiles: async (path) => {
+    try {
+      return await ipcRenderer.invoke('read-folder-files', path);
+    } catch (err) {
+      console.error('readFolderFiles error:', err);
+      return null;
+    }
+  },
 
 });
 
 // ##########################################
-// next file -> renderer.js part-1
+// next file -> index.html -> renderer.js part-1
 // ##########################################

@@ -146,3 +146,9 @@
      opacity: 0.45;
      cursor: not-allowed;
  }
+
+ #moveTreeContainer:empty::before {
+     content: "No hay elementos aún.";
+     color: #888;
+     font-style: italic;
+ }

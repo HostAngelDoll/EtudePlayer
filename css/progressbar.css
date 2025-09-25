@@ -11,6 +11,7 @@
   box-shadow: 0 0 10px rgba(0,0,0,0.5);
   display: none;
   padding: 10px;
+  z-index: 22000;
 }
 
 #progressBar {
