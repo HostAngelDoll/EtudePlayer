@@ -22,7 +22,7 @@ List:
 - ✅ Move to recicler bin
 - Historial para desahcer operaciones de archivo
 - Global Keyboard shortcuts
-- folders list as activity bar as vscode (styling finally)
+- Folders list as activity bar as vscode (estilos finales)
 
 
 ------------------------------------------------------------------------------------------------
@@ -80,6 +80,10 @@ List:
       - Num8 random song in playlist
       - Num9 volume up
 
+  - Estirilizado final de etude player
+    - icono en escritorio
+    - implementacion de barra de status y barra de playback con waveseekbar
+    - ... proximamente más detalles ...
 
 ------------------------------------------------------------------------------------------------
 
