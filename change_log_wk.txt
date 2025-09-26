@@ -2,43 +2,34 @@ List:
 
 // Te pasare a ti estos archivos [ "main.js", "preload.js", "renderer.js", "index.html" ];
 
-- ✅ Volume control and porcentague Volume
-- ✅ buttons Volume
-- ✅ Mute button
-- ✅ Waveform Seekbar
-- ✅ Duration / Current Dur / Left Dur
-- ✅ Pitch audio control
-- ✅ Select multiple items in playlist
-- ✅ button copy filename
-- ✅ status bar
-- ✅implement video view
-- Move file to folder to invoke context menu (and button?)
-- button to move to recicler bin
-- Global Keyboard shortcuts
-- folders list as activity bar as vscode (styling finally)
-
-
-----------------------------------------------------------------------------------------------
 
 - ✅ Volume slider control and porcentaje volume
-- ✅ Volume and mute buttons
+- ✅ Buttons Volume and mute buttons
 - ✅ Waveform Seekbar
 - ✅ Casilla: Stop after current song
 - ✅ Labels: Total Duration / Current Dur / Left Dur 
 - ✅ Button for copy filename without extencion for a current song
 - ✅ Pitch audio control
+- ✅ Select multiple items in playlist
 - ✅ Status bar for playback state (playing/pause) in stop case then show name player
 - ✅ loading folder in background process for avoid freeze program
 - ✅ Equalizer audio
 - ✅ Canciones del nodo xmas ordenadas por nombre de archivo y no por rutas, tras haber obtenido todas las canciones de las carpetas xmas
 - ✅ incluir tambien archivos mp4 (videos) y poder verlos
+- ✅ Move file to folder to invoke context menu
 - ✅ Mejorar la playlist y Mostrar una notificacion tooltip en el lado inferior derecho con progressbar para ver las operaciones de indexeado y actualizacion de carpetas y playlist. implemtacion de manejo de errores.
-- Menu contextual de operaciones de archivo y ventanas de dialogo para operaciones de archivos y cambiar el nombre de archivo
+- ✅ Menu contextual de operaciones de archivo y ventanas de dialogo para operaciones de archivos y cambiar el nombre de archivo
+- ✅ Move to recicler bin
+- Historial para desahcer operaciones de archivo
+- Global Keyboard shortcuts
+- folders list as activity bar as vscode (styling finally)
+
 
 ------------------------------------------------------------------------------------------------
 
 
 🟢 Funcionalidades en playlist en orden:
+
   - ✅ Menu contextual
   - ✅ Renombrado (dialogo y funciones)
     - ✅ mecanismo de cambiar el nombre al archivo
@@ -46,37 +37,48 @@ List:
 
   - ✅ Copiar nombres y rutas al portapapeles
 
-  - Mover elementos
+  - ✅ Mover elementos
     - ✅ dialogo de mover
     - ✅ modificar nombre de carpetas en el dialogo
     - ✅ verificacion antes de mover archivos
-    - mecanica para mover archivos 
-      - mover archivos a carpetas de destino
-      - quitar de la playlist lo que se movio
+    - ✅ mecanica para mover archivos 
+      - ✅ mover archivos a carpetas de destino
+      - ✅ quitar de la playlist lo que se movio
+
+  - ✅ Mover a papelera ("E:/_Exclude/l_reallydeleted") con captcha
+    - ✅ Mover archivos a una papelera
+    - ✅ Pedir al usuario con customPrompt una palabra clave
+    - ✅ Un boton en el index para abrir la carpeta papelera con el explorador de archivos
+  
+  - ✅ Una opcion en el context menu de una cancion selecionada para abrir la ubicacion de la cancion en el explorador
 
   - Guardar historial de movimientos para poder desahcer
     - Contar con logica para desahcer operaciones de archivo
     - Funcion para desahcer movimientos:
       - creacion de carpetas
-      - movida de archivos
+        - se supone que estan vacias para hacer eso
+        - si hay archivos el historial se borra
+      - movida de archivos y movida a papelera
+        - se supone que el directorio antiguo sigue existiendo
+        - si no se crea el directorio en donde existia
       - cambios de nombres en los archivos
+        - se supone que el archivo sigue existiendo
+        - de lo contrario el historial se borra
       - cambios de nombres en las carpetas
+        - se supone que la carpeta con su nombre actual existiendo
+        - de lo contrario se borra el historial
 
-🟢 Quiero implementar lo de mover archivos (experiencia): 
-  - lógica para mover los archivos - ventana de diálogo personalizado para elegir las carpetas 
-  - configurar tooltip para ver progreso de movida de archivos 
-  - manejo de los cambios en la playlist si los archivo seleccionados dejan la carpeta lo cual es obvio que ocurra. 
-  - si el archivo a mover se esta reproduciendo entonces detener el playback y se elimina de la playlist
-  - encontre un bug en el programa mientras reintentaba integrar el codigo a etudeplayer:
-    - cuando movia un archivo a otra carpeta, mientras se movia la playlist se comporta de forma rara porque empiezan a salir las canciones de la carpeta hacia donde las estoy moviendo en la playlist aunque regresan las canciones de la carpeta origen.
-    - se glichea mucho la notificacion tooltipo donde se ejecutan funciones de actualizado de cache y varios listeners de actualizado se ejectuan simultaneamente causando glicheo en la tooltip de notificaciones.
-    - lo que escribo antes fueron de los varios reintentos de implentacion de codigo que te he pedido antes y fue frustrante ver esos bugs
-
-
-nota: ya vistes lo que ya esta implementado por lo tanto no reinventes la rueda, ok? piensa más tiempo porfa
-  
-* Actualizar la cache del sistema de archivos (carpeta actual de la playlist) desde la nueva ubicación.
-* Ejecutar `fs.promises.rename()` (o similar) por cada archivo.
+  - Global Keyboard shortcuts
+    - Configurable desde un json
+      - Num1 back 10 seconds playback
+      - Num2 next song
+      - Num3 ahead 10 seconds playback
+      - Num4 previous
+      - Num5 play/pause
+      - Num6 Activate/minimize window
+      - Num7 volume down
+      - Num8 random song in playlist
+      - Num9 volume up
 
 
 ------------------------------------------------------------------------------------------------
@@ -107,7 +109,7 @@ nota: ya vistes lo que ya esta implementado por lo tanto no reinventes la rueda,
   - ✅ o haber cambios en las carpetas de las canciones tanto agregado como movimientos y eliminacion
   - ✅ aplica tambien para canciones de navidad al vigilar todas las carpetas
   - ✅ tras cambiar nombre entonces la playlist se actualiza 
-    - con el nuevo nombre en cuando apariencia como en el alamcenado de las playlist
+  - ✅ con el nuevo nombre en cuando apariencia como en el alamcenado de las playlist
 
 
 ✅ Ventana de dialogo para mover archivos:
@@ -142,10 +144,8 @@ nota: ya vistes lo que ya esta implementado por lo tanto no reinventes la rueda,
   - Uno o mas elementos selecionados:
     - ✅ mover a carpeta (dialog futuro)
     - ✅ verificacion antes de mover
-    - mover a carpeta (mecanismo)
-    - mover a papelera ("E:/_Exclude/l_reallydeleted")
-
-  - Deshacer ultimo(s) movimientos(s) (tras mover, renombrar o desabilitar archivos)
+    - ✅ mover a carpeta (mecanismo)
+    - mover a papelera ("E:/_Exclude/l_reallydeleted") con captcha
 
   - ✅ cuando esta un solo elemento seleccionado:
     - ✅ play song
@@ -157,6 +157,19 @@ nota: ya vistes lo que ya esta implementado por lo tanto no reinventes la rueda,
     - ✅ copiar nombres de archivo
     - ✅ copiar rutas de archivo
 
+  - Deshacer ultimo(s) movimientos(s) (tras mover, renombrar o desabilitar archivos)
+
+
+✅ Quiero implementar lo de mover archivos (experiencia): 
+  - lógica para mover los archivos - ventana de diálogo personalizado para elegir las carpetas 
+  - configurar tooltip para ver progreso de movida de archivos 
+  - manejo de los cambios en la playlist si los archivo seleccionados dejan la carpeta lo cual es obvio que ocurra. 
+  - si el archivo a mover se esta reproduciendo entonces detener el playback y se elimina de la playlist
+  - encontre un bug en el programa mientras reintentaba integrar el codigo a etudeplayer:
+    - cuando movia un archivo a otra carpeta, mientras se movia la playlist se comporta de forma rara porque empiezan a salir las canciones de la carpeta hacia donde las estoy moviendo en la playlist aunque regresan las canciones de la carpeta origen.
+    - se glichea mucho la notificacion tooltipo donde se ejecutan funciones de actualizado de cache y varios listeners de actualizado se ejectuan simultaneamente causando glicheo en la tooltip de notificaciones.
+    - lo que escribo antes fueron de los varios reintentos de implentacion de codigo que te he pedido antes y fue frustrante ver esos bugs
+  - nota: ya vistes lo que ya esta implementado por lo tanto no reinventes la rueda, ok? piensa más tiempo porfa
 
 
 ------------------------------------------------------------------------------------------------
@@ -169,32 +182,10 @@ Extention Feature (Ending jobs)
 - set css styles in the UI.css (finally)
 
 
-------------------------------------------------------------------------------------------------
-
-
-CONSEJOS ADICIONALES:
-- Divide tu app en módulos: AudioManager, UIManager, FileManager, etc.
-
-
-global keyboard shortcuts:
-- Num1 back 10 seconds playback
-- Num2 next song
-- Num3 ahead 10 seconds playback
-- Num4 previous
-- Num5 play/pause
-- Num6 Activate/minimize window
-- Num7 volume down
-- Num8 random song in playlist
-- Num9 volume up
-
-
------------------------------------------------------------------------
-
-
 comming soon:
+- Divide tu app en módulos: AudioManager, UIManager, FileManager, etc.
 - propeties file for view tags and thecnical info
 - file searcher
-
 
 Other Tools to unify EtudePlayer convert to Etude Studio:
 - HandImageENJS

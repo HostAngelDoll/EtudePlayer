@@ -1,5 +1,5 @@
-#renameModal {
-  display: none;
+.custom-prompt-overlay {
+  display: flex;
   position: fixed;
   top: 0;
   left: 0;
@@ -11,28 +11,39 @@
   z-index: 11000;
 }
 
-.modal-content {
+.custom-prompt-content {
   background: #fff;
   padding: 20px;
   border-radius: 8px;
-  min-width: 300px;
+  min-width: 100px;
+  max-width: 400px;   /* Máximo ancho relativo a la ventana */
+  outline: none;
+  display: flex;
+  flex-direction: column;
+  word-wrap: break-word; /* Fuerza el salto de línea si es necesario */
+  overflow: hidden; /* Evita scrollbars */
 }
 
-#renameMessage {
+.custom-prompt-message {
   font-size: 16px;
   font-weight: bold;
+  word-break: break-word; /* Rompe palabras largas si es necesario */
+  white-space: normal;    /* Asegura que el texto se envuelva */
 }
 
-#renameInput {
+.custom-prompt-input {
+  pointer-events: auto;
   width: 100%;
   margin-top: 10px;
+  z-index: 11001;
 }
 
-.modal-buttons {
+.custom-prompt-buttons {
   margin-top: 15px;
   text-align: right;
 }
 
-button {
+.custom-prompt-buttons button {
   margin-left: 10px;
+  z-index: 11002;
 }

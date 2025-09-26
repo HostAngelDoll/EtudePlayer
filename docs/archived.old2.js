@@ -921,3 +921,228 @@ window.electronAPI.onMoveTreeAction(async (action) => {
     return;
   }
 });
+
+
+// renderer.js 2025-09-25 19:56:00
+
+/**
+ * Validate & prepare move:
+ * - files: array de rutas absolutas (strings)
+ * - destPath: ruta de carpeta destino (string)
+ * Devuelve { success: true, operations } o { success:false, error }
+ */
+async function validateAndPrepareMove(files, destPath) {
+  // 1) comprobar input
+  if (!Array.isArray(files) || files.length === 0) {
+    // problema lógico: notificar por consola como pediste
+    console.error('validateAndPrepareMove: filesToMove está vacío. Abortando preparación.');
+    return { success: false, error: 'No files to move' };
+  }
+
+  // 2) comprobar destino existe (usamos IPC al main)
+  const destExists = await window.electronAPI.pathExists(destPath);
+  if (!destExists) {
+    showProgressNotification(`La carpeta de destino no existe: ${destPath}`, 1, true, 5000);
+    return { success: false, error: 'Destination does not exist' };
+  }
+
+  // 3) detener playback si alguno de los archivos está reproduciéndose
+  const normalizedSong = songPath ? normalizePathForCompare(songPath) : null;
+  if (normalizedSong) {
+    for (const f of files) {
+      if (normalizePathForCompare(f) === normalizedSong) {
+        // Detener playback y limpiar UI como pediste
+        try {
+          if (wavesurfer) wavesurfer.stop(); // detiene y resetea el cursor
+        } catch (e) { /* ignore */ }
+        clearPlayingStyle();
+        songPath = null;
+        statusBar.textContent = originalTitle;
+        break;
+      }
+    }
+  }
+
+  // 4) obtener nombres existentes en destino
+  const existing = await window.electronAPI.readFolderFiles(destPath);
+  if (existing === null) {
+    showProgressNotification(`Error accediendo a la carpeta destino: ${destPath}`, 1, true, 5000);
+    return { success: false, error: 'Cannot read destination folder' };
+  }
+
+  // Set con nombres en minúsculas para comparaciones (basename + ext)
+  const plannedLowerSet = new Set(existing.map(n => n.toLowerCase()));
+
+  // 5) construir operaciones respetando conflictos (basename + ext)
+  const operations = [];
+
+  for (const src of files) {
+    const basename = (typeof src === 'string') ? src.split(/[\\/]/).pop() : String(src);
+    // separa base y ext
+    const lastDot = basename.lastIndexOf('.');
+    const baseNoExt = lastDot >= 0 ? basename.substring(0, lastDot) : basename;
+    const ext = lastDot >= 0 ? basename.substring(lastDot) : '';
+
+    // generar nombre único si ya existe (base.ext, base (2).ext, base (3).ext, ...)
+    let candidate = basename;
+    let counter = 2;
+    while (plannedLowerSet.has(candidate.toLowerCase())) {
+      candidate = `${baseNoExt} (${counter})${ext}`;
+      counter++;
+    }
+
+    // reservar el nombre en el set (para conflictos entre múltiples archivos que movemos)
+    plannedLowerSet.add(candidate.toLowerCase());
+
+    // path destino final (Windows style, ya que tu proyecto usa backslashes)
+    const destFull = `${destPath}\\${candidate}`;
+
+    operations.push({ src, dest: destFull });
+  }
+
+  // Guardar resultado globalmente para ETAPA 3
+  pendingMoveOperations = operations;
+
+  // Notificar éxito (preparado)
+  showProgressNotification(`Preparadas ${operations.length} operaciones para mover.`, 1, false, 3500);
+  console.log('validateAndPrepareMove -> pendingMoveOperations:', operations);
+
+  return { success: true, operations };
+}
+
+/**
+ * Ejecutar las operaciones preparadas (ETAPA 3) y sincronizar UI/cache.
+ */
+async function executePendingMovesAndSync() {
+  if (!Array.isArray(pendingMoveOperations) || pendingMoveOperations.length === 0) {
+    console.error('No hay operaciones pendientes para ejecutar.');
+    return;
+  }
+
+  // 1) Desactivar listeners / watchdog
+  disableWatchdog = true; // tu flag local para ignorar eventos entrantes
+  try { await window.electronAPI.setWatchdog(false); } catch (e) {
+    console.warn('No se pudo desactivar watchdog en main:', e);
+  }
+
+  // Subscribe para progreso
+  window.electronAPI.onMoveProgress(({ current, total, file }) => {
+    showProgressNotification(`Moviendo ${current} / ${total}`, current / total);
+  });
+
+  // Mostrar inicio
+  showProgressNotification(`Iniciando movimiento de ${pendingMoveOperations.length} archivos...`, 0);
+
+  // 2) Ejecutar en main
+  const res = await window.electronAPI.executeMoveOperations(pendingMoveOperations);
+
+  // 3) Procesar resultados
+  let moved = [];
+  let failed = [];
+  if (res && Array.isArray(res.results)) {
+    moved = res.results.filter(r => r.success).map(r => r.src);
+    failed = res.results.filter(r => !r.success);
+  } else if (res && res.success === true && res.results) {
+    moved = res.results.map(r => r.src);
+  } else {
+    // si res no tiene results pero indica error
+    if (res && res.error) {
+      showProgressNotification('Error moviendo archivos', 1, true, 4000);
+      alert(`Error moviendo archivos: ${res.error}`);
+    }
+  }
+
+  // // 4) Actualizar playlist local quitando los archivos movidos
+  // if (moved.length > 0 && Array.isArray(playlist)) {
+  //   const movedSet = new Set(moved.map(normalizePathForCompare));
+  //   playlist = playlist.filter(item => !movedSet.has(normalizePathForCompare(item.path || item)));
+  //   updatePlaylistUI();
+  // }
+
+  // // 5) Actualizar cache de la carpeta actual (si existe)
+  // try {
+  //   if (currentOpenFolder && typeof currentOpenFolder === 'string') {
+  //     const cacheKey = String(currentOpenFolder);
+  //     playlistCache[cacheKey] = playlist;
+  //     try { localStorage.setItem('playlistCache', JSON.stringify(playlistCache)); } catch (e) {
+  //       console.warn('No se pudo guardar playlistCache:', e);
+  //     }
+  //   }
+  // } catch (e) {
+  //   console.warn('Error al actualizar cache después del move:', e);
+  // }
+
+  // ------------------- reemplazar por este bloque -------------------
+  if (Array.isArray(moved) && moved.length > 0 && Array.isArray(playlist)) {
+    // 1) crear set de rutas movidas (normalizadas)
+    const movedSet = new Set(moved.map(normalizePathForCompare));
+
+    // 2) quitar esas rutas del array playlist (filtro in-place -> reasignación)
+    playlist = playlist.filter(item => !movedSet.has(normalizePathForCompare(item.path || item)));
+
+    // 3) preparar array para loadPlaylistFromArray: [{name, path}, ...]
+    const songsArray = playlist.map(it => ({ name: it.name, path: it.path }));
+
+    // 4) Volver a cargar la playlist usando loadPlaylistFromArray con la carpeta actual
+    //    — esto recalcula duraciones, ordena y actualiza cache internamente.
+    try {
+      // mantener watchdog DESACTIVADO mientras recargamos para evitar refreshes por watchers
+      await loadPlaylistFromArray(songsArray, currentOpenFolder || null, true, "afterMoving"); // force refresh
+    } catch (err) {
+      console.error('Error re-cargando playlist tras mover archivos:', err);
+      // En caso extremo fallback: renderizar la lista actual (mínimo visual)
+      // updatePlaylistUI(); // solo como último recurso si loadPlaylist falla
+    }
+  } else {
+    // Si no hay 'moved' o playlist vacío, llamar a loadPlaylistFromArray con la lista actual
+    // para asegurar coherencia (no cambia la carpeta abierta).
+    try {
+      const songsArrayFallback = Array.isArray(playlist) ? playlist.map(it => ({ name: it.name, path: it.path })) : [];
+      if (songsArrayFallback.length) await loadPlaylistFromArray(songsArrayFallback, currentOpenFolder || null, true, "aftherMoveplaylistVoid");
+    } catch (e) { /* noop */ }
+  }
+
+  // 6) Reactivar watchdog / listeners
+  disableWatchdog = false;
+  try { await window.electronAPI.setWatchdog(true); } catch (e) {
+    console.warn('No se pudo reactivar watchdog en main:', e);
+  }
+
+  // 7) Notificar resultado al usuario
+  if (failed.length > 0) {
+    // construir mensaje con los fallidos
+    const msg = failed.map(f => `${f.src} — ${f.error || 'Error desconocido'}`).join('\n');
+    showProgressNotification(`Movidos: ${moved.length}. Fallidos: ${failed.length}`, 1, true, 6000);
+    customAlert('No se pudieron mover los siguientes archivos:\n\n' + msg);
+  } else {
+    showProgressNotification('Archivos movidos correctamente', 1, false, 3500);
+  }
+
+  // 8) limpiar estado
+  pendingMoveOperations = null;
+  // resetear visual del botón de preparar (si existe)
+  if (moveConfirmBtn) {
+    delete moveConfirmBtn.dataset.prepared;
+    moveConfirmBtn.textContent = 'Mover aquí';
+  }
+
+  // Opcional: si quieres forzar recarga del folder en UI:
+  // if (currentOpenFolder) { await loadPlaylistFromFolder(currentOpenFolder); }
+
+  return { moved, failed };
+}
+
+
+// const copyBtn = document.getElementById('copyBtn');
+
+// copyBtn.addEventListener('click', () => {
+//   if (!playlist.length) return;
+//   const currentSong = playlist[currentSongIndex];
+//   if (!currentSong) return;
+
+//   const filename = currentSong.name.replace(/\.[^/.]+$/, "");  // Extraer nombre sin extensión
+
+//   navigator.clipboard.writeText(filename).then(() => {
+//     console.log(`Copied: ${filename}`);
+//   });
+// });

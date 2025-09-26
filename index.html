@@ -8,12 +8,13 @@
   <link rel="stylesheet" href="css/playlist_ui.css">
   <link rel="stylesheet" href="css/progressbar.css">
   <link rel="stylesheet" href="css/move_modal.css">
+  <link rel="stylesheet" href="css/alert_modal.css">
   <script src="wavesurfer.min.js"></script>
   <script src="custom_modal.js"></script>
+  <script src="alert.modal.js"></script>
 </head>
 
 <body>
-
 
   <div id="progressTooltip">
     <div id="progressMessage">Indexando...</div>
@@ -29,7 +30,7 @@
     <button id="playPauseBtn">▶️/⏸️</button>
     <button id="nextBtn">⏭️ Siguiente</button>
     <button id="stopBtn">⏹️ Stop</button>
-    <button id="copyBtn">Copy Filename</button>
+    <button id="openTrashBtn">Abrir papelera</button>
 
     <br>
 
@@ -159,10 +160,6 @@
     </div>
 
     <div class="modal-topbar">
-      <!-- <div class="left-controls">
-        <button class="control" id="btnUp">./</button>
-        <button class="control" id="btnNewFolder">/+</button>
-      </div> -->
       <div style="flex:1"></div>
       <div class="current-path" id="moveCurrentPath" title="Ruta actual">E:\_Internal</div>
     </div>

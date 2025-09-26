@@ -1,5 +1,5 @@
 // main.js
-const { app, BrowserWindow, ipcMain, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, shell } = require('electron');
 const path = require('path');
 const fs = require('fs').promises;
 const chokidar = require("chokidar");
@@ -7,8 +7,11 @@ const CACHE_PATH = path.join(app.getPath("userData"), "cache.json");
 const XMAS_START_YEAR = 2004;
 const XMAS_END_YEAR = 2021;
 const ROOT_YEARS_PATH = "E:\\_Internal";
+const TRASH_FOLDER = "E:\\_Exclude\\l_reallydeleted";
 let watchers = new Map();
+let watchdogEnabled = true; // --- WATCHDOG GLOBAL (activar/desactivar notificaciones de watchers) ---
 let win;
+
 
 async function createWindow() { // main function to start app
   win = new BrowserWindow({
@@ -101,6 +104,7 @@ function watchFolder(folderPath, opts = {}) {
 
         // Si hay supresión activa para esta carpeta, NO hacer nada
         // if (isSuppressed(folderPath)) return;
+        if (!watchdogEnabled) return;
 
         if (opts.type === 'xmas') {
           // Re-armar lista combinada y enviarla
@@ -313,6 +317,7 @@ ipcMain.handle("show-context-menu", (event, { type, files }) => {
       { label: "Cambiar nombre", click: () => event.sender.send("context-menu-action", { type: "rename", files }) },
       { label: "Copiar nombre", click: () => event.sender.send("context-menu-action", { type: "copyName", files }) },
       { label: "Copiar ruta", click: () => event.sender.send("context-menu-action", { type: "copyPath", files }) },
+      { label: "Abrir ubicación del archivo", click: () => event.sender.send("context-menu-action", { type: "revealInFolder", files }) },
       { type: "separator" },
       { label: "Mover a carpeta...", click: () => event.sender.send("context-menu-action", { type: "moveToFolder", files }) },
       { label: "Mover a papelera", click: () => event.sender.send("context-menu-action", { type: "moveToTrash", files }) },
@@ -447,9 +452,10 @@ ipcMain.handle('rename-folder', async (event, { oldPath, newName }) => {
 });
 
 
-// --------------------
+// ---------------------------------------------------------
 // Para mover archivos Utils IPC desde renderer (verificadores)
-// --------------------
+// ---------------------------------------------------------
+
 ipcMain.handle('path-exists', async (event, folderPath) => {
   try {
     if (!folderPath) return false;
@@ -476,6 +482,181 @@ ipcMain.handle('read-folder-files', async (event, folderPath) => {
 // Move / create-folder / move-tree
 // ----------------------------------------------------------
 
+ipcMain.handle('set-watchdog', (event, enabled) => {
+  watchdogEnabled = !!enabled;
+  return watchdogEnabled;
+});
+
+ipcMain.handle('execute-move-operations', async (event, { operations } = {}) => {
+  if (!Array.isArray(operations) || operations.length === 0) {
+    return { success: false, error: 'No operations provided', results: [] };
+  }
+
+  const results = [];
+  try {
+    // Desactivar watchdog para evitar ruidos durante el movimiento
+    watchdogEnabled = false;
+
+    for (let i = 0; i < operations.length; i++) {
+      const op = operations[i];
+      try {
+        // Ejecutar rename
+        await fs.rename(op.src, op.dest);
+        results.push({ ...op, success: true });
+        // Informar progreso al renderer
+        try {
+          event.sender.send('move-progress', { current: i + 1, total: operations.length, file: op.src });
+        } catch (e) { /* ignore send errors */ }
+      } catch (err) {
+        // Al primer error: registrar y devolver (NO hacemos rollback)
+        results.push({ ...op, success: false, error: err.message || String(err) });
+        // Reactivar watchdog antes de devolver
+        watchdogEnabled = true;
+        return { success: false, error: err.message || String(err), results };
+      }
+    }
+
+    // Si llegamos aquí → todo movido con éxito
+    watchdogEnabled = true;
+    return { success: true, results };
+
+  } catch (err) {
+    // En caso de fallo imprevisto
+    watchdogEnabled = true;
+    return { success: false, error: err.message || String(err), results };
+  }
+});
+
+// ----------------------------------------------------------
+// Recicler Bin logical operation
+// ----------------------------------------------------------
+
+// --- Asegurar que la carpeta papelera exista al inicio (opcional) ---
+async function ensureTrashFolder() {
+  try {
+    await fs.mkdir(TRASH_FOLDER, { recursive: true });
+  } catch (e) { /* ignore errors on startup */ }
+}
+ensureTrashFolder().catch(() => {});
+
+
+// ----------------------
+// Move to trash (ETAPA bin)
+// ----------------------
+
+ipcMain.handle('move-to-trash', async (event, { files } = {}) => {
+  if (!Array.isArray(files) || files.length === 0) {
+    return { success: false, error: 'No files provided', results: [] };
+  }
+
+  // Asegurarnos de que carpeta papelera existe
+  try { await fs.mkdir(TRASH_FOLDER, { recursive: true }); } catch (e) { /* ignore */ }
+
+  // Leer nombres existentes en la papelera para checar conflictos
+  let existingNames = [];
+  try {
+    const entries = await fs.readdir(TRASH_FOLDER, { withFileTypes: true });
+    existingNames = entries.filter(e => e.isFile()).map(e => e.name);
+  } catch (e) {
+    // Si no podemos leer la papelera -> error
+    return { success: false, error: `No se puede acceder a la papelera: ${e.message || e}`, results: [] };
+  }
+
+  const reserved = new Set(existingNames.map(n => n.toLowerCase()));
+  const results = [];
+
+  // Emit progress helper
+  const sendProgress = (i, total, src) => {
+    try { event.sender.send('move-to-trash-progress', { current: i, total, file: src }); } catch (e) { /* ignore */ }
+  };
+
+  for (let i = 0; i < files.length; i++) {
+    const src = files[i];
+    try {
+      // verificar que src exista antes de mover
+      try {
+        await fs.access(src);
+      } catch (e) {
+        results.push({ src, dest: null, success: false, error: 'Fuente no existe' });
+        // detener en el primer error
+        return { success: false, error: 'Fuente no existe', results };
+      }
+
+      const origName = src.split(/[\\/]/).pop();
+      let base = origName;
+      const lastDot = origName.lastIndexOf('.');
+      const nameNoExt = lastDot >= 0 ? origName.substring(0, lastDot) : origName;
+      const ext = lastDot >= 0 ? origName.substring(lastDot) : '';
+
+      // resolver conflictos: name.ext, name (2).ext, ...
+      let candidate = origName;
+      let counter = 2;
+      while (reserved.has(candidate.toLowerCase())) {
+        candidate = `${nameNoExt} (${counter})${ext}`;
+        counter++;
+      }
+      reserved.add(candidate.toLowerCase());
+
+      const dest = path.join(TRASH_FOLDER, candidate);
+
+      // Intentar mover
+      await fs.rename(src, dest);
+
+      results.push({ src, dest, success: true });
+      sendProgress(i + 1, files.length, src);
+
+    } catch (err) {
+      // en primer error: devolver resultados parciales y detener (no rollback)
+      results.push({ src, dest: null, success: false, error: err && err.message ? err.message : String(err) });
+      return { success: false, error: err && err.message ? err.message : String(err), results };
+    }
+  }
+
+  // Todo moved ok
+  return { success: true, results };
+});
+
+
+// ----------------------
+// Abrir carpeta papelera en explorador
+// ----------------------
+
+ipcMain.handle('open-trash-folder', async () => {
+  try {
+    await shell.openPath(TRASH_FOLDER);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err && err.message ? err.message : String(err) };
+  }
+});
+
+// --------------------
+// Reveal in folder (abrir explorador y seleccionar archivo)
+// --------------------
+ipcMain.handle('reveal-in-folder', async (event, filePath) => {
+  try {
+    if (!filePath || typeof filePath !== 'string') {
+      return { success: false, error: 'Ruta inválida' };
+    }
+
+    // Verificar existencia
+    try {
+      await fs.access(filePath);
+    } catch (e) {
+      return { success: false, error: 'Archivo no encontrado' };
+    }
+
+    // Intentar abrir y seleccionar en el explorador del SO
+    try {
+      shell.showItemInFolder(filePath);
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err && err.message ? err.message : String(err) };
+    }
+  } catch (err) {
+    return { success: false, error: err && err.message ? err.message : String(err) };
+  }
+});
 
 
 // ----------------------------------------------------------

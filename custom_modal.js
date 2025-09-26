@@ -26,71 +26,56 @@ Object.defineProperty(window, 'confirm', {
 
 function customPrompt(message, defaultValue = "", isSecondary = false) {
   return new Promise((resolve) => {
-    // Crear elementos del DOM
+    // ✅ Cargar el CSS dinámicamente si aún no se ha cargado
+    const cssId = 'customPromptCSS';
+    if (!document.getElementById(cssId)) {
+      const head = document.head;
+      const link = document.createElement('link');
+      link.id = cssId;
+      link.rel = 'stylesheet';
+      link.type = 'text/css';
+      link.href = 'css/input_modal.css'; // 🔁 Ajusta la ruta según tu estructura
+      head.appendChild(link);
+    }
+
     const mainOverlay = document.getElementById("moveModalOverlay");
-    
-    if (isSecondary) {
-      // 🔒 Desactivar el modal principal mientras el prompt está abierto
-      if (mainOverlay) {
-        mainOverlay.setAttribute("aria-hidden", "true");
-        mainOverlay.setAttribute("inert", ""); // desactiva interacción
-      }
+
+    if (isSecondary && mainOverlay) {
+      mainOverlay.setAttribute("aria-hidden", "true");
+      mainOverlay.setAttribute("inert", "");
     }
 
     const modal = document.createElement("div");
     modal.setAttribute("role", "dialog");
     modal.setAttribute("aria-modal", "true");
     modal.setAttribute("aria-label", message);
-    modal.style.display = "flex";
-    modal.style.position = "fixed";
-    modal.style.top = "0";
-    modal.style.left = "0";
-    modal.style.width = "100%";
-    modal.style.height = "100%";
-    modal.style.background = "rgba(0, 0, 0, 0.5)";
-    modal.style.justifyContent = "center";
-    modal.style.alignItems = "center";
-    modal.style.zIndex = "11000";
+    modal.className = "custom-prompt-overlay";
 
     const content = document.createElement("div");
-    content.style.background = "#fff";
-    content.style.padding = "20px";
-    content.style.borderRadius = "8px";
-    content.style.minWidth = "300px";
-    content.style.maxWidth = "90%";
-    content.style.outline = "none";
+    content.className = "custom-prompt-content";
     content.setAttribute("role", "document");
 
     const messageEl = document.createElement("div");
+    messageEl.className = "custom-prompt-message";
     messageEl.textContent = message;
-    messageEl.style.fontSize = "16px";
-    messageEl.style.fontWeight = "bold";
     messageEl.id = "prompt-message";
 
     const input = document.createElement("input");
     input.type = "text";
     input.value = defaultValue;
-    input.id = "inputNewString"
+    input.id = "inputNewString";
+    input.className = "custom-prompt-input";
     input.setAttribute("aria-labelledby", "prompt-message");
-    input.style.pointerEvents = "auto";
-    input.style.width = "100%";
-    input.style.marginTop = "10px";
-    input.style.zIndex = "11001";
     input.tabIndex = 0;
 
     const buttons = document.createElement("div");
-    buttons.style.marginTop = "15px";
-    buttons.style.textAlign = "right";
+    buttons.className = "custom-prompt-buttons";
 
     const btnCancel = document.createElement("button");
     btnCancel.textContent = "Cancelar";
-    btnCancel.style.marginLeft = "10px";
-    btnCancel.style.zIndex = "11002";
 
     const btnOk = document.createElement("button");
     btnOk.textContent = "OK";
-    btnOk.style.marginLeft = "10px";
-    btnOk.style.zIndex = "11002";
 
     buttons.appendChild(btnCancel);
     buttons.appendChild(btnOk);
@@ -101,7 +86,6 @@ function customPrompt(message, defaultValue = "", isSecondary = false) {
     modal.appendChild(content);
     document.body.appendChild(modal);
 
-    // Dar foco al input después de renderizar
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         input.focus();
@@ -122,7 +106,6 @@ function customPrompt(message, defaultValue = "", isSecondary = false) {
       input.removeEventListener("keydown", onKey);
       document.body.removeChild(modal);
 
-      // ✅ Restaurar accesibilidad del modal principal
       if (mainOverlay && isSecondary) {
         mainOverlay.removeAttribute("aria-hidden");
         mainOverlay.removeAttribute("inert");

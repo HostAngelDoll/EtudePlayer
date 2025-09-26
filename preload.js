@@ -124,6 +124,68 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }
   },
 
+  // ---- Watchdog control (activar/desactivar emisión de eventos desde main) ----
+  setWatchdog: async (enabled) => {
+    try {
+      return await ipcRenderer.invoke('set-watchdog', !!enabled);
+    } catch (err) {
+      console.error('setWatchdog error:', err);
+      return null;
+    }
+  },
+
+  // Ejecutar operaciones de move (ETAPA 3)
+  executeMoveOperations: async (operations) => {
+    try {
+      return await ipcRenderer.invoke('execute-move-operations', { operations });
+    } catch (err) {
+      console.error('executeMoveOperations error:', err);
+      return { success: false, error: err && err.message ? err.message : String(err), results: [] };
+    }
+  },
+
+  // Subscribir progreso de movimiento (etapa 3)
+  onMoveProgress: (callback) => {
+    ipcRenderer.removeAllListeners('move-progress');
+    ipcRenderer.on('move-progress', (event, payload) => callback(payload));
+  },
+
+  // Mover a papelera (main)
+  moveToTrash: async (files) => {
+    try {
+      return await ipcRenderer.invoke('move-to-trash', { files });
+    } catch (err) {
+      console.error('moveToTrash error:', err);
+      return { success: false, error: err && err.message ? err.message : String(err), results: [] };
+    }
+  },
+
+  // Progreso de move-to-trash
+  onMoveToTrashProgress: (callback) => {
+    ipcRenderer.removeAllListeners('move-to-trash-progress');
+    ipcRenderer.on('move-to-trash-progress', (event, payload) => callback(payload));
+  },
+
+  // Abrir carpeta papelera
+  openTrashFolder: async () => {
+    try {
+      return await ipcRenderer.invoke('open-trash-folder');
+    } catch (err) {
+      console.error('openTrashFolder error:', err);
+      return { success: false, error: err && err.message ? err.message : String(err) };
+    }
+  },
+
+  // Revelar archivo en carpeta (invoca main -> shell.showItemInFolder)
+  revealInFolder: async (filePath) => {
+    try {
+      return await ipcRenderer.invoke('reveal-in-folder', filePath);
+    } catch (err) {
+      console.error('revealInFolder error:', err);
+      return { success: false, error: err && err.message ? err.message : String(err) };
+    }
+  },
+
 });
 
 // ##########################################

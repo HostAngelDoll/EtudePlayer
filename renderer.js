@@ -18,27 +18,24 @@ const stopAfterCheckbox = document.getElementById('stopAfterCheckbox');
 const totalDurLabel = document.getElementById('totalDur');
 const currentDurLabel = document.getElementById('currentDur');
 const leftDurLabel = document.getElementById('leftDur');
-const copyBtn = document.getElementById('copyBtn');
 const pitchSlider = document.getElementById('pitchSlider');
 const pitchInput = document.getElementById('pitchInput');
 const statusBar = document.getElementById('statusBar');
 const resetBtn = document.getElementById('resetEQ');
 const eqContainer = document.getElementById('eqContainer');
 const sliders = eqContainer.querySelectorAll('input[type="range"]');
-const originalTitle = "EtudePlayer";
+const ReBinBtn = document.getElementById('openTrashBtn');
 
 
 // ---------------------------------------------------
 // inicializar
 // ---------------------------------------------------
 
+const originalTitle = "EtudePlayer";
 const ROOT_YEARS_PATH = "E:\\_Internal";
 const eqBands = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
-const moveTreeState = { // estado para preservar entre refreshes
-  expandedPaths: new Set(),
-  selectedPath: null
-};
-let filesWhileRenaming = []
+const moveTreeState = { expandedPaths: new Set(), selectedPath: null }; // estado para preservar entre refreshes
+let filesWhileRenaming = [];
 let wavesurfer = null;
 let previousVolume = 1;
 let currentVolume = 1;   // 0 a 1
@@ -58,15 +55,9 @@ let messageFromOpenByNode = false;
 let disableWatchdog = false;
 let currentOpenFolder = null; // ruta de la carpeta actualmente abierta en UI de move files
 let savedEqValues = JSON.parse(localStorage.getItem('eqValues') || '[]');
-if (savedEqValues.length !== eqBands.length) { savedEqValues = eqBands.map(() => 0); }
-volumeLabel.textContent = `${volumeSlider.value}%`;
-document.title = originalTitle;
-
-
-// -----------------------------------------------
-// Iniciating > Modal move-to-folder state
-// -----------------------------------------------
-let moveModalOverlay = null;
+let stopFolderUpdate = false
+let debug_LoadFromArrayFX = false // para ver el status de la carga por array
+let moveModalOverlay = null;        // Iniciating > Modal move-to-folder state
 let moveTreeContainer = null;
 let moveCurrentPathEl = null;
 let btnUp = null;
@@ -77,10 +68,27 @@ let modalTreeData = null; // la estructura entera para el modal
 let selectedMoveNode = null; // nodo seleccionado para mover
 let filesToMove = []; // rutas de archivos seleccionados para mover (cuando el modal se abre)
 let pendingMoveOperations = null; // al prepararse: array [{ src, dest }, ...]
+if (savedEqValues.length !== eqBands.length) { savedEqValues = eqBands.map(() => 0); }
+volumeLabel.textContent = `${volumeSlider.value}%`;
+document.title = originalTitle;
 
 // -----------------------------------------------------
 // funciones de renderer
 // -----------------------------------------------------
+
+function obtenerFechaActualStr() {
+  const fecha = new Date();
+
+  const año = fecha.getFullYear();
+  const mes = String(fecha.getMonth() + 1).padStart(2, '0'); // Mes comienza en 0
+  const dia = String(fecha.getDate()).padStart(2, '0');
+
+  const horas = String(fecha.getHours()).padStart(2, '0');
+  const minutos = String(fecha.getMinutes()).padStart(2, '0');
+  const segundos = String(fecha.getSeconds()).padStart(2, '0');
+
+  return `${año}-${mes}-${dia} ${horas}:${minutos}:${segundos}`;
+}
 
 function vaciarPlaylistCache() {
   playlistCache = {};
@@ -122,7 +130,7 @@ async function getAudioDurationSeconds(src) {
   });
 }
 
-async function loadPlaylistFromArray(songsArray, cacheKey, forceNext = false) {
+async function loadPlaylistFromArray(songsArray, cacheKey, forceNext = false, callingFrom = "") {
   // songsArray: array de strings (paths) o array de objetos {name, path}
   // cacheKey: string identificador para cache (ej: folderPath o 'xmas-all')
   if (!Array.isArray(songsArray)) return;
@@ -166,7 +174,7 @@ async function loadPlaylistFromArray(songsArray, cacheKey, forceNext = false) {
 
     if (!songPath) {
       newPlaylist.push({ name, path: '', duration: '0:00' });
-      showProgressNotification(`Cargando ${i + 1} de ${total}`, (i + 1) / total);
+      showProgressNotification(`!!Cargando ${i + 1} de ${total}`, (i + 1) / total);
       continue;
     }
 
@@ -181,7 +189,7 @@ async function loadPlaylistFromArray(songsArray, cacheKey, forceNext = false) {
     });
 
     // update progress using tu función existente
-    showProgressNotification(`Cargando ${i + 1} de ${total}`, (i + 1) / total);
+    showProgressNotification(`Cargando!! ${i + 1} de ${total}`, (i + 1) / total);
   }
 
   playlist = newPlaylist;
@@ -197,6 +205,8 @@ async function loadPlaylistFromArray(songsArray, cacheKey, forceNext = false) {
   }
 
   updatePlaylistUI();
+  if (debug_LoadFromArrayFX) console.warn("Update hasta el final desde: '" + callingFrom + "' en este tiempo: " + obtenerFechaActualStr());
+
   showProgressNotification('Carga completa', 1); // esto ocultará después si tu func lo hace
   if (disableWatchdog) {
     disableWatchdog = false;
@@ -216,7 +226,7 @@ async function loadPlaylistFromFolder(folderPath) {
   const songsArray = files.map(f => ({ name: f, path: `${folderPath}\\${f}` }));
 
   // delegar a loadPlaylistFromArray con cacheKey claro
-  await loadPlaylistFromArray(songsArray, cacheKey);
+  await loadPlaylistFromArray(songsArray, cacheKey, false, "loadPlaylistFromFolder");
 }
 
 window.addEventListener('beforeunload', () => {
@@ -442,18 +452,6 @@ nextBtn.addEventListener('click', () => {
   playSong(currentSongIndex);
 });
 
-copyBtn.addEventListener('click', () => {
-  if (!playlist.length) return;
-  const currentSong = playlist[currentSongIndex];
-  if (!currentSong) return;
-
-  const filename = currentSong.name.replace(/\.[^/.]+$/, "");  // Extraer nombre sin extensión
-
-  navigator.clipboard.writeText(filename).then(() => {
-    console.log(`Copied: ${filename}`);
-  });
-});
-
 playPauseBtn.addEventListener('click', () => { playSongBtn(); });
 
 stopBtn.addEventListener('click', () => { stopSong(); });
@@ -531,9 +529,11 @@ window.addEventListener('DOMContentLoaded', async () => {
       // Si es carpeta de música, cargar canciones bajo demanda
       if (node.type === 'folder' && node.path) {
         messageFromOpenByNode = true;
-        await loadPlaylistFromFolder(node.path);
+        stopFolderUpdate = false;
 
-        window.electronAPI.selectFolder(node.path); // <- nueva función que vamos a exponer
+        await loadPlaylistFromFolder(node.path);
+        window.electronAPI.selectFolder(node.path);
+        currentOpenFolder = node.path;
 
         node.loadedSongs = true; // marca que ya cargamos
         if (autoPlay && playlist.length > 0) playSong(0); // solo si el flag autoPlay está activo
@@ -553,7 +553,7 @@ window.addEventListener('DOMContentLoaded', async () => {
           }));
 
           messageFromOpenByNode = true;
-          await loadPlaylistFromArray(songs, 'xmas-all'); // cacheKey claro 'xmas-all'
+          await loadPlaylistFromArray(songs, 'xmas-all', false, "cilckNodeXmas"); // cacheKey claro 'xmas-all'
 
           window.electronAPI.selectXmas(node.path);
 
@@ -929,17 +929,18 @@ window.electronAPI.onFileRenamed(async ({ oldPath, newPath }) => {
     document.title = formated_name;
     songPath = newPath;
   }
-  loadPlaylistFromArray(playlist, pathFolder, true); // vuelve a renderizar
+  loadPlaylistFromArray(playlist, pathFolder, true, "onFileRenamed"); // vuelve a renderizar
 });
 
 // carpetas de cada año
 window.electronAPI.onFolderUpdated(async (files, folderPath) => {
+  if (stopFolderUpdate) return;
   if (disableWatchdog) return;
   // Convertir a formato {name, path} si viene como string
   const songsArray = files.map(f => (typeof f === 'string' ? { name: f.split(/[\\/]/).pop(), path: f } : f));
 
   // Cargar playlist desde array (recalcula duración, ordena alfabéticamente, actualiza cache)
-  await loadPlaylistFromArray(songsArray, folderPath, true);
+  await loadPlaylistFromArray(songsArray, folderPath, true, "onFolderUpdated");
 
   // Mostrar tooltip de notificación
   if (!messageFromOpenByNode) {
@@ -967,7 +968,7 @@ window.electronAPI.onPlaylistUpdated(async (payload) => {
   const songsArray = payload.files.map(f => ({ name: f.split(/[\\/]/).pop(), path: f }));
 
   // Cargar (recalcula duraciones para los no cacheados)
-  await loadPlaylistFromArray(songsArray, folderKey, true);
+  await loadPlaylistFromArray(songsArray, folderKey, true, "onPlaylistUpdated");
 
   // Notificar al usuario (tooltip cerrable manualmente)
   if (!messageFromOpenByNode) {
@@ -1025,6 +1026,33 @@ window.electronAPI.onContextMenuAction(async (action) => {
     return;
   }
 
+  if (action.type === "moveToTrash") {
+    executeMoveToTrash(action);
+    return;
+  }
+
+  if (action.type === "revealInFolder") {
+    const filePath = (action.files && action.files[0]) || null;
+    if (!filePath) return;
+
+    // Llamar a la API expuesta por preload
+    try {
+      const res = await window.electronAPI.revealInFolder(filePath);
+      if (res && res.success) {
+        // Opcional: mostrar un pequeño tooltip confirmando la apertura
+        showProgressNotification('Abriendo en el explorador...', 1, false, 1500);
+      } else {
+        // Mostrar tooltip de error (archivo no encontrado o fallo)
+        const errMsg = (res && res.error) ? res.error : 'Archivo no encontrado';
+        showProgressNotification(`No se pudo abrir el archivo:\n${errMsg}`, 1, true, 4000);
+      }
+    } catch (err) {
+      console.error('Error intentando revelar archivo en carpeta:', err);
+      showProgressNotification('Error al intentar abrir el explorador', 1, true, 4000);
+    }
+    return;
+  }
+
   switch (action.type) {
     case "copyName": {
       // copiar nombre (single)
@@ -1051,9 +1079,6 @@ window.electronAPI.onContextMenuAction(async (action) => {
       if (Array.isArray(action.files) && action.files.length) {
         navigator.clipboard.writeText(action.files.join('\n'));
       }
-      break;
-    case "moveToTrash":
-      // mover a papelera
       break;
     case "undo":
       // deshacer última operación
@@ -1173,7 +1198,7 @@ async function openMoveDialog(files = []) {
   }));
 
   // agregar nodo Xmas al final
-  if (data.xmas) { rootNodes.push(data.xmas);}
+  if (data.xmas) { rootNodes.push(data.xmas); }
 
   modalTreeData = {
     name: 'root',
@@ -1181,7 +1206,7 @@ async function openMoveDialog(files = []) {
     path: ROOT_YEARS_PATH,
     nodes: rootNodes
   };
-  
+
   renderMoveTree(modalTreeData); // Renderizar el árbol
   moveCurrentPathEl.textContent = ROOT_YEARS_PATH; // Setear ruta actual visual
   document.getElementById('moveModalCloseBtn').onclick = closeMoveDialog; // Eventos del modal
@@ -1212,29 +1237,26 @@ async function openMoveDialog(files = []) {
     // filesWhileRenaming contiene las rutas seleccionadas para mover
     const files = Array.isArray(filesWhileRenaming) && filesWhileRenaming.length ? filesWhileRenaming.slice() : filesToMove.slice();
 
-    // Validar y preparar
-    const res = await validateAndPrepareMove(files, selectedMoveNode.path);
-
-    if (!res || res.success === false) {
-      console.error('Preparación de movimiento fallida:', res && res.error);
+    const prep = await validateAndPrepareMove(files, selectedMoveNode.path);
+    if (!prep || prep.success === false) {
+      console.error('Preparación fallida:', prep && prep.error);
       return;
     }
 
-    // Marca el botón como "preparado" (flag visual) — la etapa 3 ejecutará pendingMoveOperations
-    moveConfirmBtn.dataset.prepared = 'true';
-    moveConfirmBtn.textContent = '✔ Preparado';
-    moveConfirmBtn.disabled = false;
-    
-    // Seccion para mover archivos de verdad
-    console.log('Mover a: "', selectedMoveNode.path, '" files:', filesToMove);
+    // Mover archivos de fomra real
+    stopFolderUpdate = true;
+    await executePendingMovesAndSync();
+    console.log('Moved to: "', selectedMoveNode.path, '" files:', filesToMove);
 
-    return; //por el momento para hacer pruebas finales
-
-    // Tras finalizar las operaciones
     selectedMoveNode = null;
     filesWhileRenaming = [];
-    filesToMove = []
-    closeMoveDialog(); //piden no cerrar pero por el momento es simulacion
+    filesToMove = [];
+
+    setTimeout(() => {
+      stopFolderUpdate = false;
+    }, 5000);
+
+    closeMoveDialog();
   };
 }
 
@@ -1634,6 +1656,234 @@ async function validateAndPrepareMove(files, destPath) {
   console.log('validateAndPrepareMove -> pendingMoveOperations:', operations);
 
   return { success: true, operations };
+}
+
+/**
+ * Ejecutar las operaciones preparadas (ETAPA 3) y sincronizar UI/cache.
+ */
+async function executePendingMovesAndSync() {
+  if (!Array.isArray(pendingMoveOperations) || pendingMoveOperations.length === 0) {
+    console.error('No hay operaciones pendientes para ejecutar.');
+    return;
+  }
+
+  // 1) Desactivar listeners / watchdog
+  disableWatchdog = true; // tu flag local para ignorar eventos entrantes
+  try { await window.electronAPI.setWatchdog(false); } catch (e) {
+    console.warn('No se pudo desactivar watchdog en main:', e);
+  }
+
+  // Subscribe para progreso
+  window.electronAPI.onMoveProgress(({ current, total, file }) => {
+    showProgressNotification(`Moviendo ${current} / ${total}`, current / total);
+  });
+
+  // Mostrar inicio
+  showProgressNotification(`Iniciando movimiento de ${pendingMoveOperations.length} archivos...`, 0);
+
+  // 2) Ejecutar en main
+  const res = await window.electronAPI.executeMoveOperations(pendingMoveOperations);
+
+  // 3) Procesar resultados
+  let moved = [];
+  let failed = [];
+  if (res && Array.isArray(res.results)) {
+    moved = res.results.filter(r => r.success).map(r => r.src);
+    failed = res.results.filter(r => !r.success);
+  } else if (res && res.success === true && res.results) {
+    moved = res.results.map(r => r.src);
+  } else {
+    // si res no tiene results pero indica error
+    if (res && res.error) {
+      showProgressNotification('Error moviendo archivos', 1, true, 4000);
+      alert(`Error moviendo archivos: ${res.error}`);
+    }
+  }
+
+
+  // (4 & 5) Actualizar cache y playlist
+  if (Array.isArray(moved) && moved.length > 0 && Array.isArray(playlist)) {
+    // 1) crear set de rutas movidas (normalizadas)
+    const movedSet = new Set(moved.map(normalizePathForCompare));
+
+    // 2) quitar esas rutas del array playlist (filtro in-place -> reasignación)
+    playlist = playlist.filter(item => !movedSet.has(normalizePathForCompare(item.path || item)));
+
+    // 3) preparar array para loadPlaylistFromArray: [{name, path}, ...]
+    const songsArray = playlist.map(it => ({ name: it.name, path: it.path }));
+
+    // 4) Volver a cargar la playlist usando loadPlaylistFromArray con la carpeta actual
+    //    — esto recalcula duraciones, ordena y actualiza cache internamente.
+    try {
+      // mantener watchdog DESACTIVADO mientras recargamos para evitar refreshes por watchers
+      await loadPlaylistFromArray(songsArray, currentOpenFolder || null, true, "afterMovingCorrect"); // force refresh
+    } catch (err) {
+      console.error('Error re-cargando playlist tras mover archivos:', err);
+      // En caso extremo fallback: renderizar la lista actual (mínimo visual)
+      // updatePlaylistUI(); // solo como último recurso si loadPlaylist falla
+    }
+  } else {
+    // Si no hay 'moved' o playlist vacío, llamar a loadPlaylistFromArray con la lista actual
+    // para asegurar coherencia (no cambia la carpeta abierta).
+    try {
+      const songsArrayFallback = Array.isArray(playlist) ? playlist.map(it => ({ name: it.name, path: it.path })) : [];
+      if (songsArrayFallback.length) await loadPlaylistFromArray(songsArrayFallback, currentOpenFolder || null, true, "afterMovePlaylistVoid");
+    } catch (e) { /* noop */ }
+  }
+
+  // 6) Reactivar watchdog / listeners
+  disableWatchdog = false;
+  try { await window.electronAPI.setWatchdog(true); } catch (e) {
+    console.warn('No se pudo reactivar watchdog en main:', e);
+  }
+
+  // 7) Notificar resultado al usuario
+  if (failed.length > 0) {
+    // construir mensaje con los fallidos
+    const msg = failed.map(f => `${f.src} — ${f.error || 'Error desconocido'}`).join('\n');
+    showProgressNotification(`Movidos: ${moved.length}. Fallidos: ${failed.length}`, 1, true, 6000);
+    customAlert('No se pudieron mover los siguientes archivos:\n\n' + msg);
+  } else {
+    showProgressNotification('Archivos movidos correctamente', 1, false, 3500);
+  }
+
+  // 8) limpiar estado
+  pendingMoveOperations = null;
+  // resetear visual del botón de preparar (si existe)
+  if (moveConfirmBtn) {
+    delete moveConfirmBtn.dataset.prepared;
+    moveConfirmBtn.textContent = 'Mover aquí';
+  }
+
+  return { moved, failed };
+}
+
+// ------------------------------------------------------------
+// move to recicler bin
+// ------------------------------------------------------------
+
+function generateCaptcha(len = 6) {
+  const CH = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // evitar O,0, I,1 para claridad
+  let s = '';
+  for (let i = 0; i < len; i++) s += CH[Math.floor(Math.random() * CH.length)];
+  return s;
+}
+
+ReBinBtn.addEventListener('click', async () => {
+  showProgressNotification('Abriendo papelera...', 0);
+  const res = await window.electronAPI.openTrashFolder();
+  if (res && res.success) {
+    showProgressNotification('Papelera abierta', 1, false, 2000);
+  } else {
+    showProgressNotification('No se pudo abrir la papelera', 1, true, 4000);
+  }
+});
+
+
+async function executeMoveToTrash(action) {
+
+  // files: array de rutas absolutas
+  const files = Array.isArray(action.files) ? action.files.slice() : [];
+  if (!files.length) {
+    console.error('moveToTrash called with empty files array.');
+    return;
+  }
+
+  (async () => {
+    // 1) generar captcha aleatorio y pedir confirmación
+    const captcha = generateCaptcha(6);
+    const promptMsg = `CONFIRMACIÓN: Para mover a la papelera, escribe exactamente: ${captcha}`;
+    const typed = await customPrompt(promptMsg, ''); // customPrompt debe devolver string o null
+    if (!typed) {
+      showProgressNotification('Operación cancelada', 1, true, 2000);
+      return;
+    }
+    if (typed !== captcha) {
+      showProgressNotification('Captcha incorrecto. Operación cancelada.', 1, true, 3500);
+      return;
+    }
+
+    // 2) Si alguno está reproduciéndose -> detener playback y quitar estilo
+    const songNormalized = songPath ? normalizePathForCompare(songPath) : null;
+    if (songNormalized) {
+      for (const f of files) {
+        if (normalizePathForCompare(f) === songNormalized) {
+          try { if (wavesurfer) wavesurfer.stop(); } catch (e) { /* ignore */ }
+          clearPlayingStyle();
+          songPath = null;
+          statusBar.textContent = originalTitle;
+          break;
+        }
+      }
+    }
+
+    // 3) Desactivar watchdog local y remote
+    disableWatchdog = true;
+    stopFolderUpdate = true;
+    try { await window.electronAPI.setWatchdog(false); } catch (e) { /* ignore */ }
+
+    // 4) Suscribirse a progreso
+    window.electronAPI.onMoveToTrashProgress(({ current, total, file }) => {
+      showProgressNotification(`Papelera: ${current} / ${total}`, current / total);
+    });
+
+    showProgressNotification('Moviendo archivos a la papelera...', 0);
+
+    // 5) Ejecutar move en main
+    const res = await window.electronAPI.moveToTrash(files);
+
+    // 6) Procesar resultados
+    let moved = [];
+    let failed = [];
+
+    if (res && Array.isArray(res.results)) {
+      moved = res.results.filter(r => r.success).map(r => r.src);
+      failed = res.results.filter(r => !r.success);
+    } else if (res && res.success && res.results) {
+      moved = res.results.filter(r => r.success).map(r => r.src);
+    } else if (res && res.success === false && res.results && res.results.length) {
+      // fallback
+      moved = res.results.filter(r => r.success).map(r => r.src);
+      failed = res.results.filter(r => !r.success);
+    } else if (res && res.success === false && res.error) {
+      showProgressNotification('Error moviendo a la papelera', 1, true, 4000);
+      alert('Error moviendo archivos a la papelera:\n' + res.error);
+    }
+
+    // 7) Quitar movidos de playlist y recargar carpeta actual (sin updatePlaylistUI directo)
+    if (moved.length > 0 && Array.isArray(playlist)) {
+      const movedSet = new Set(moved.map(normalizePathForCompare));
+      playlist = playlist.filter(item => !movedSet.has(normalizePathForCompare(item.path || item)));
+      const songsArray = playlist.map(it => ({ name: it.name, path: it.path }));
+      // Mantener watchdog DESACTIVADO mientras recargamos
+      try {
+        await loadPlaylistFromArray(songsArray, currentOpenFolder || null, true);
+      } catch (e) {
+        console.error('Error recargando playlist tras mover a papelera:', e);
+        updatePlaylistUI(); // fallback visual
+      }
+    }
+
+    // 8) Reactivar watchdog
+    disableWatchdog = false;
+    setTimeout(() => {
+      stopFolderUpdate = false;
+    }, 6000);
+
+    try { await window.electronAPI.setWatchdog(true); } catch (e) { /* ignore */ }
+
+    // 9) Notificar resultados
+    if (failed.length > 0) {
+      const msg = failed.map(f => `${f.src} — ${f.error || 'Error desconocido'}`).join('\n');
+      showProgressNotification(`Movidos: ${moved.length}. Fallidos: ${failed.length}`, 1, true, 6000);
+      customAlert('No se pudieron mover a la papelera:\n\n' + msg);
+    } else {
+      showProgressNotification('Archivos movidos a la papelera', 1, false, 3000);
+    }
+  })();
+
+  return;
+
 }
 
 

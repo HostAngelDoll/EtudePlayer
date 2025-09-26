@@ -96,4 +96,29 @@ en orden vamos a saber que entendistes para hacerte correcciones y decirte si pr
 | **?** | Notificación al usuario                          |
 | **5** | Deshacer movimiento (opcional)                   |
 
----
+--------------------------------------------------------------------------
+
+
+### ✅ **ETAPA 3: Mover archivos y actualizar estado del sistema**
+
+**Objetivo**: Ejecutar la operación de mover archivos y sincronizar la playlist y la carpeta elegida.
+
+**Tareas**:
+
+1. **Mover los archivos físicamente** al destino.
+
+   * Mostrar barra de progreso / tooltip.
+   * Si hubo error, detener la operacion y revertir movimientos antes de la accion.
+
+2. **Actualizar la aplicación según los cambios**:
+
+   * Eliminar de la playlist los archivos movidos.
+   * Actualizar la caché de carpeta la carpeta actual de la playlist.
+   * Evitar múltiples listeners o glitches visuales (throttling / desactivar temporalmente).
+   * Respetar el estado de la UI y asegurar coherencia en la playlist.
+
+3. **Notificar al usuario del resultado**:
+
+   * Si todo salió bien → tooltip: "Archivos movidos correctamente".
+   * Si hubo errores → tooltip con detalle de fallos.
+
