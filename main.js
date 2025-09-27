@@ -118,7 +118,7 @@ function watchFolder(folderPath, opts = {}) {
           // Leer solo la carpeta
           const entries = await fs.readdir(folderPath, { withFileTypes: true });
           const files = entries
-            .filter(f => f.isFile() && (f.name.toLowerCase().endsWith('.mp3') || f.name.toLowerCase().endsWith('.mp4')))
+            .filter(f => f.isFile() && (f.name.toLowerCase().endsWith('.mp3') || f.name.toLowerCase().endsWith('.mp4') || f.name.toLowerCase().endsWith('.m4a')))
             // .map(f => path.join(folderPath, f.name));
             .map(f => ({ name: f.name, path: `${folderPath}\\${f.name}` }));
           // win.webContents.send('playlist-updated', { folderPath, files });
@@ -160,7 +160,7 @@ async function gatherXmasSongs(baseRoot = ROOT_YEARS_PATH) {
       await fs.access(folder);
       const entries = await fs.readdir(folder, { withFileTypes: true });
       const mediaFiles = entries
-        .filter(f => f.isFile() && (f.name.toLowerCase().endsWith('.mp3') || f.name.toLowerCase().endsWith('.mp4')))
+        .filter(f => f.isFile() && (f.name.toLowerCase().endsWith('.mp3') || f.name.toLowerCase().endsWith('.mp4') || f.name.toLowerCase().endsWith('.m4a')))
         .map(f => path.join(folder, f.name));
       allSongs.push(...mediaFiles);
     } catch (e) { /* carpeta no existe → ignorar */ }
@@ -263,7 +263,7 @@ ipcMain.handle('get-xmas-songs', async (event, rootPath) => {
 ipcMain.on('select-folder', async (event, folderPath) => {
   try {
     const files = await fs.readdir(folderPath);
-    const mediaFiles = files.filter(f => f.endsWith('.mp3') || f.endsWith('.mp4'))
+    const mediaFiles = files.filter(f => f.endsWith('.mp3') || f.endsWith('.mp4') || f.endsWith('.m4a'))
       .map(f => `${folderPath}\\${f}`);
 
     // Enviar playlist inicial
@@ -297,7 +297,7 @@ ipcMain.handle('get-songs', async (event, folderPath) => { //ext check
   try {
     const entries = await fs.readdir(folderPath, { withFileTypes: true });
     const files = entries
-      .filter(f => f.isFile() && (f.name.toLowerCase().endsWith('.mp3') || f.name.toLowerCase().endsWith('.mp4')))
+      .filter(f => f.isFile() && (f.name.toLowerCase().endsWith('.mp3') || f.name.toLowerCase().endsWith('.mp4') || f.name.toLowerCase().endsWith('.m4a')))
       .map(f => f.name)
       .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 
@@ -701,8 +701,8 @@ ipcMain.handle('rename-path', async (event, { oldPath, newPath } = {}) => {
 // Global key
 // ------------------------------------------------------------------------------
 
-// Convertir 'ctrl+1' -> 'CommandOrControl+1' (más robusto)
 function normalizeAccel(raw) {
+  // Convertir 'ctrl+1' -> 'CommandOrControl+1' (más robusto)
   if (!raw || typeof raw !== 'string') return null;
   const parts = raw.split('+').map(p => p.trim().toLowerCase()).filter(Boolean);
   if (!parts.length) return null;

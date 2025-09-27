@@ -20,18 +20,25 @@ List:
 - ✅ Mejorar la playlist y Mostrar una notificacion tooltip en el lado inferior derecho con progressbar para ver las operaciones de indexeado y actualizacion de carpetas y playlist. implemtacion de manejo de errores.
 - ✅ Menu contextual de operaciones de archivo y ventanas de dialogo para operaciones de archivos y cambiar el nombre de archivo
 - ✅ Move to recicler bin
-- Historial para desahcer operaciones de archivo
-- Global Keyboard shortcuts
-- Folders list as activity bar as vscode (estilos finales)
+- ✅ Historial para desahcer operaciones de archivo
+- ✅ Global Keyboard shortcuts
+- Estirilizado final de etudeplayer
 
 
 ------------------------------------------------------------------------------------------------
 
 
-  - Estirilizado final de etude player
+  - Estirilizado y reorden de la interfaz de etudeplayer
     - icono en escritorio
-    - implementacion de barra de status y barra de playback con waveseekbar
+    - seleccion de modo claro u obscuro manual y deteccion del tema a usar (windows)
+    - reposicionamiento de la barra de status y barra de playback con waveseekbar
+    - ecualizador como dialogo
+    - el árbol de las carpetas sera una activity bar
+      - el contenido interno de las carpetas de año seguira siendo una treeview
+      - la playlist estara en el resto de la pantalla
+    - 
     - ... proximamente más detalles ...
+    - ocultar menubar de desarollo de electron
 
 
 ------------------------------------------------------------------------------------------------
@@ -110,7 +117,7 @@ List:
     - ✅ copiar nombres de archivo
     - ✅ copiar rutas de archivo
 
-  - Deshacer ultimo(s) movimientos(s) (tras mover, renombrar o desabilitar archivos)
+  - ✅  Deshacer ultimo(s) movimientos(s) (tras mover, renombrar o desabilitar archivos)
 
 
 ✅ Quiero implementar lo de mover archivos (experiencia): 
@@ -183,8 +190,6 @@ List:
     - ✅ verificar (*) funciones no implementada en renderer.js o en main.js
     - ✅ mensaje de aviso si interfiere un programa como el jubilado foobar2000
 
-
-
 ------------------------------------------------------------------------------------------------
 
 
@@ -199,6 +204,8 @@ comming soon:
 - Divide tu app en módulos: AudioManager, UIManager, FileManager, etc.
 - propeties file for view tags and thecnical info
 - file searcher
+- barra de menus
+- custom titlebar
 
 Other Tools to unify EtudePlayer convert to Etude Studio:
 - HandImageENJS
