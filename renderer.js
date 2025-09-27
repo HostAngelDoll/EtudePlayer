@@ -34,7 +34,7 @@ const openReBinBtn = document.getElementById('openTrashBtn');
 const originalTitle = "EtudePlayer";
 const ROOT_YEARS_PATH = "E:\\_Internal";
 const eqBands = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
-const moveTreeState = { expandedPaths: new Set(), selectedPath: null }; // estado para preservar entre refreshes
+const moveTreeState = { expandedPaths: new Set(), selectedPath: null }; // preservar entre refreshes
 let filesWhileRenaming = [];
 let wavesurfer = null;
 let previousVolume = 1;
@@ -2386,10 +2386,9 @@ async function undoLastAction() {
 }
 
 // -------------------------------------------------------------------------
-// Global keyshortcuts
+// Global keyshortcuts | Shortcuts handler 
 // -------------------------------------------------------------------------
 
-// ----------------- Shortcuts handler (renderer) -----------------
 window.electronAPI.onShortcutAction(async ({ action } = {}) => {
   if (!action) return;
 
