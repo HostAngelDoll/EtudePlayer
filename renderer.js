@@ -24,7 +24,7 @@ const statusBar = document.getElementById('statusBar');
 const resetBtn = document.getElementById('resetEQ');
 const eqContainer = document.getElementById('eqContainer');
 const sliders = eqContainer.querySelectorAll('input[type="range"]');
-const ReBinBtn = document.getElementById('openTrashBtn');
+const openReBinBtn = document.getElementById('openTrashBtn');
 
 
 // ---------------------------------------------------
@@ -68,13 +68,14 @@ let modalTreeData = null; // la estructura entera para el modal
 let selectedMoveNode = null; // nodo seleccionado para mover
 let filesToMove = []; // rutas de archivos seleccionados para mover (cuando el modal se abre)
 let pendingMoveOperations = null; // al prepararse: array [{ src, dest }, ...]
+let historyStack = []; // LIFO
 if (savedEqValues.length !== eqBands.length) { savedEqValues = eqBands.map(() => 0); }
 volumeLabel.textContent = `${volumeSlider.value}%`;
 document.title = originalTitle;
 
-// -----------------------------------------------------
-// funciones de renderer
-// -----------------------------------------------------
+// ----------------------------------------------------------------------
+// playback and playlist state
+// ----------------------------------------------------------------------
 
 function obtenerFechaActualStr() {
   const fecha = new Date();
@@ -174,7 +175,7 @@ async function loadPlaylistFromArray(songsArray, cacheKey, forceNext = false, ca
 
     if (!songPath) {
       newPlaylist.push({ name, path: '', duration: '0:00' });
-      showProgressNotification(`!!Cargando ${i + 1} de ${total}`, (i + 1) / total);
+      showProgressNotification(`Cargando ${i + 1} de ${total}`, (i + 1) / total);
       continue;
     }
 
@@ -189,7 +190,7 @@ async function loadPlaylistFromArray(songsArray, cacheKey, forceNext = false, ca
     });
 
     // update progress using tu función existente
-    showProgressNotification(`Cargando!! ${i + 1} de ${total}`, (i + 1) / total);
+    showProgressNotification(`Cargando ${i + 1} de ${total}`, (i + 1) / total);
   }
 
   playlist = newPlaylist;
@@ -229,14 +230,55 @@ async function loadPlaylistFromFolder(folderPath) {
   await loadPlaylistFromArray(songsArray, cacheKey, false, "loadPlaylistFromFolder");
 }
 
-window.addEventListener('beforeunload', () => {
+function saveCachePlaylist() {
   try {
     localStorage.setItem('playlistCache', JSON.stringify(playlistCache));
     console.log('playlistCache guardado antes de cerrar');
   } catch (e) {
     console.warn('No se pudo guardar playlistCache al cerrar:', e);
   }
-});
+}
+
+function getNameAndYear(rawFileUrl) {
+  let path = rawFileUrl.replace(/^file:\/+/, ''); // 1. Eliminar el prefijo "file://"
+  path = decodeURIComponent(path); // 2. Decodificar caracteres codificados (como %20 -> espacio)
+  const pathSubstring = path.substring(13, 17); // 3. Extraer subcadena (índices 13 a 16 inclusive = JS substring(13,17))
+  let filename = path.split(/[\\/]/).pop(); // 4. Obtener nombre de archivo
+  if (filename.includes('.')) { filename = filename.substring(0, filename.lastIndexOf('.')); }
+  return `${pathSubstring}. ${filename}`;
+}
+
+function getNameAndYear_forArray(rawFileUrl) {
+  let path = rawFileUrl;
+
+  // Si la ruta empieza con "file://", eliminar ese prefijo
+  if (path.startsWith('file://')) {
+    path = path.replace(/^file:\/+/, '');
+  }
+
+  // Decodificar posibles caracteres codificados
+  path = decodeURIComponent(path);
+
+  // Extraer nombre del archivo (lo que viene después del último '/' o '\')
+  let filename = path.split(/[\\/]/).pop();
+
+  // Si el nombre tiene extensión, eliminarla
+  if (filename.includes('.')) {
+    filename = filename.substring(0, filename.lastIndexOf('.'));
+  }
+
+  // Extraer año: substring desde posición 13 a 16 (índices 13 a 16 inclusive)
+  // Para evitar errores, verificamos que la cadena sea suficientemente larga
+  let pathSubstring = '';
+  if (path.length >= 17) {
+    pathSubstring = path.substring(13, 17);
+  } else {
+    // Si la ruta es muy corta, devolvemos un valor por defecto o vacío
+    pathSubstring = '????';
+  }
+
+  return `${pathSubstring}. ${filename}`;
+}
 
 function clearPlayingStyle() {
   // Seleccionamos todas las filas del tbody que tengan la clase "playing"
@@ -247,15 +289,6 @@ function clearPlayingStyle() {
     fila.classList.remove('playing');
   });
 }
-
-
-// ##########################################
-// Advertencia: 
-// No tener todas las partes del renderer.js significa no poder hacerle juicio hasta que este entrgeado
-
-// renderer.js // part-2 to 4
-// ##########################################
-
 
 function updatePlaylistUI() {
   const tbody = document.querySelector('#playlist tbody');
@@ -348,50 +381,13 @@ function updatePlaylistUI() {
   }
 }
 
-// ----------------------------------------------------------------------
-// playback state
-// ----------------------------------------------------------------------
+// ##########################################
+// Advertencia: 
+// No tener todas las partes del renderer.js significa no poder hacerle juicio hasta que este entrgeado
 
-function getNameAndYear(rawFileUrl) {
-  let path = rawFileUrl.replace(/^file:\/+/, ''); // 1. Eliminar el prefijo "file://"
-  path = decodeURIComponent(path); // 2. Decodificar caracteres codificados (como %20 -> espacio)
-  const pathSubstring = path.substring(13, 17); // 3. Extraer subcadena (índices 13 a 16 inclusive = JS substring(13,17))
-  let filename = path.split(/[\\/]/).pop(); // 4. Obtener nombre de archivo
-  if (filename.includes('.')) { filename = filename.substring(0, filename.lastIndexOf('.')); }
-  return `${pathSubstring}. ${filename}`;
-}
+// renderer.js // part-2 to 4
+// ##########################################
 
-function getNameAndYear_forArray(rawFileUrl) {
-  let path = rawFileUrl;
-
-  // Si la ruta empieza con "file://", eliminar ese prefijo
-  if (path.startsWith('file://')) {
-    path = path.replace(/^file:\/+/, '');
-  }
-
-  // Decodificar posibles caracteres codificados
-  path = decodeURIComponent(path);
-
-  // Extraer nombre del archivo (lo que viene después del último '/' o '\')
-  let filename = path.split(/[\\/]/).pop();
-
-  // Si el nombre tiene extensión, eliminarla
-  if (filename.includes('.')) {
-    filename = filename.substring(0, filename.lastIndexOf('.'));
-  }
-
-  // Extraer año: substring desde posición 13 a 16 (índices 13 a 16 inclusive)
-  // Para evitar errores, verificamos que la cadena sea suficientemente larga
-  let pathSubstring = '';
-  if (path.length >= 17) {
-    pathSubstring = path.substring(13, 17);
-  } else {
-    // Si la ruta es muy corta, devolvemos un valor por defecto o vacío
-    pathSubstring = '????';
-  }
-
-  return `${pathSubstring}. ${filename}`;
-}
 
 // -----------------------------------------------------
 // Controles
@@ -439,26 +435,20 @@ function playSongBtn() {
   }
 }
 
-
-prevBtn.addEventListener('click', () => {
+function prevSongBtn() {
   if (playlist.length === 0) return;
   currentSongIndex = (currentSongIndex - 1 + playlist.length) % playlist.length;
   playSong(currentSongIndex);
-});
+}
 
-nextBtn.addEventListener('click', () => {
+function nextSongBtn() {
   if (playlist.length === 0) return;
   currentSongIndex = (currentSongIndex + 1) % playlist.length;
   playSong(currentSongIndex);
-});
-
-playPauseBtn.addEventListener('click', () => { playSongBtn(); });
-
-stopBtn.addEventListener('click', () => { stopSong(); });
-
+}
 
 // ----------------------------------------------------------------------
-// Activity bar (folder)
+// Activity bar (folder) // Cargar árbol y manejar clicks en nodos
 // ----------------------------------------------------------------------
 
 function setActiveFolder(el) {
@@ -477,99 +467,178 @@ function collapseAllNodes() {
   treeContainer.querySelectorAll('li.active').forEach(li => li.classList.remove('active'));
 }
 
-// Cargar árbol y manejar clicks en nodos
-window.addEventListener('DOMContentLoaded', async () => {
+async function refreshTree() {
+  const treeContainer = document.getElementById('tree');
+  if (!treeContainer) return;
 
+  // Vaciar DOM anterior
+  treeContainer.innerHTML = '';
+
+  // Obtener datos desde main (playlists + xmas node)
+  let data;
+  try {
+    data = await window.electronAPI.getPlaylists();
+    if (!data) data = { playlists: [], xmas: null };
+  } catch (e) {
+    console.error('refreshTree: error obteniendo playlists', e);
+    data = { playlists: [], xmas: null };
+  }
+
+  // Helper recursivo para crear nodos
+  function createNode(node) {
+    const li = document.createElement('li');
+    li.classList.add('tree-node');
+    // store path if present
+    if (node.path) li.dataset.path = node.path;
+
+    // label wrapper to allow CSS targeting and prevent text-only click issues
+    const label = document.createElement('span');
+    label.className = 'node-label';
+    label.textContent = node.name || (node.path ? node.path.split(/[\\/]/).pop() : '(sin nombre)');
+    li.appendChild(label);
+
+    // create children container if needed
+    let childrenContainer = null;
+    if (node.nodes && node.nodes.length) {
+      childrenContainer = document.createElement('ul');
+      childrenContainer.className = 'children';
+      for (const child of node.nodes) {
+        childrenContainer.appendChild(createNode(child));
+      }
+      li.appendChild(childrenContainer);
+    }
+
+    // Restore expanded state if path is in moveTreeState.expandedPaths
+    if (node.path && moveTreeState.expandedPaths && moveTreeState.expandedPaths.has(node.path)) {
+      li.classList.add('open');
+      if (childrenContainer) childrenContainer.style.display = 'block';
+    }
+
+    // Restore selected state if this path matches
+    if (node.path && moveTreeState.selectedPath && normalizePathForCompare(moveTreeState.selectedPath) === normalizePathForCompare(node.path)) {
+      // Visual selection — use your setActiveFolder to keep consistency
+      setActiveFolder(li);
+      // also mark this DOM element as selected state
+      li.classList.add('active-folder');
+    }
+
+    // Toggle helper (expand / collapse)
+    const toggleOpen = () => {
+      const isOpen = li.classList.toggle('open');
+      if (isOpen) {
+        if (childrenContainer) childrenContainer.style.display = 'block';
+        if (node.path) moveTreeState.expandedPaths.add(node.path);
+      } else {
+        if (childrenContainer) childrenContainer.style.display = 'none';
+        if (node.path) moveTreeState.expandedPaths.delete(node.path);
+      }
+    };
+
+    // Click handlers
+    label.addEventListener('click', async (e) => {
+      e.stopPropagation();
+
+      // Select this node visually
+      setActiveFolder(li);
+
+      // If this is a top-level year node, close other years when expanding
+      if (li.querySelector('ul')) {
+        const isTopLevel = !li.parentElement.closest('li'); // true if direct child of root UL
+        if (isTopLevel) {
+          document.querySelectorAll('#tree > ul > li').forEach(yearLi => {
+            if (yearLi !== li) {
+              yearLi.classList.remove('open');
+              const childU = yearLi.querySelector('ul');
+              if (childU) childU.style.display = 'none';
+            }
+          });
+        }
+        // Toggle this node
+        toggleOpen();
+      }
+
+      // If it's a folder with a real path -> load songs
+      if (node.type === 'folder' && node.path) {
+        try {
+          messageFromOpenByNode = true;
+          currentOpenFolder = node.path; // marcar carpeta abierta
+          await loadPlaylistFromFolder(node.path);
+          // iniciar watcher / notificable al main
+          window.electronAPI.selectFolder(node.path);
+          node.loadedSongs = true;
+          if (autoPlay && playlist.length > 0) playSong(0);
+        } catch (err) {
+          console.error('Error cargando carpeta desde tree:', err);
+        }
+      }
+
+      // Special case: xmas-all (unir todas las canciones Xmas)
+      if (node.type === 'xmas-all') {
+        // evitar doble-fetch por múltiples clicks rápidos
+        if (node._loading) return;
+        node._loading = true;
+        try {
+          const songs = await window.electronAPI.getXmasSongs(node.path);
+          if (!Array.isArray(songs)) {
+            node._loading = false;
+            return;
+          }
+
+          playlist = songs.map(f => ({ name: f.split(/[\\/]/).pop(), path: f }));
+          messageFromOpenByNode = true;
+          await loadPlaylistFromArray(songs, 'xmas-all'); // cacheKey 'xmas-all'
+          window.electronAPI.selectXmas(node.path);
+          node.loadedSongs = true;
+          if (autoPlay && playlist.length > 0) playSong(0);
+        } catch (err) {
+          console.error('Error cargando Xmas-all:', err);
+        } finally {
+          node._loading = false;
+        }
+      }
+    });
+
+    // Allow clicking the whole li area to behave like label
+    li.addEventListener('click', (e) => {
+      // avoid double-handling if label already handled
+      if (e.target === label) return;
+      label.click();
+    });
+
+    return li;
+  }
+
+  // Build tree root
+  const rootUl = document.createElement('ul');
+
+  // Add each year node
+  (data.playlists || []).forEach(year => {
+    const yearNode = { name: year.year, nodes: year.nodes || [], type: 'year', path: `${ROOT_YEARS_PATH}\\${year.year}` };
+    rootUl.appendChild(createNode(yearNode));
+  });
+
+  // Add Xmas top node if present
+  if (data.xmas) {
+    rootUl.appendChild(createNode(data.xmas));
+  }
+
+  treeContainer.appendChild(rootUl);
+}
+
+async function initializeSavedCache() {
   try {
     const savedCache = localStorage.getItem('playlistCache');
     if (savedCache) {
       playlistCache = JSON.parse(savedCache) || {};
-      console.log('playlistCache restaurado. Claves:', Object.keys(playlistCache));
+      // console.log('playlistCache restaurado. Claves:', Object.keys(playlistCache));
     }
   } catch (err) {
     console.warn('No se pudo restaurar playlistCache:', err);
     playlistCache = {};
   }
 
-  const data = await window.electronAPI.getPlaylists();
-  const treeContainer = document.getElementById('tree');
-
-  function createNode(node) {
-    const li = document.createElement('li');
-    li.textContent = node.name;
-
-    // Subnodos
-    if (node.nodes && node.nodes.length > 0) {
-      const ul = document.createElement('ul');
-      node.nodes.forEach(child => ul.appendChild(createNode(child)));
-      li.appendChild(ul);
-    }
-
-    // Click para abrir/cerrar subnodos
-    li.addEventListener('click', async (e) => {
-      e.stopPropagation();
-
-      // 1. Activar solo este nodo
-      setActiveFolder(li);
-
-      // 2. Expandir/colapsar si tiene hijos
-      if (li.querySelector('ul')) {
-        // Si es un año (los nodos que tienen subcarpetas principales)
-        if (!li.parentElement.closest('li')) {
-          // cerrar todos los demás años
-          document.querySelectorAll('#tree > ul > li').forEach(yearLi => {
-            if (yearLi !== li) yearLi.classList.remove('open');
-          });
-        }
-
-        // abrir y cerrar este
-        li.classList.toggle('open');
-      }
-
-      // Si es carpeta de música, cargar canciones bajo demanda
-      if (node.type === 'folder' && node.path) {
-        messageFromOpenByNode = true;
-        stopFolderUpdate = false;
-
-        await loadPlaylistFromFolder(node.path);
-        window.electronAPI.selectFolder(node.path);
-        currentOpenFolder = node.path;
-
-        node.loadedSongs = true; // marca que ya cargamos
-        if (autoPlay && playlist.length > 0) playSong(0); // solo si el flag autoPlay está activo
-      }
-
-      // 🎄 Subnodo Xmas especial
-      if (node.type === 'xmas-all' && !node.loadedSongs) {
-        node.loadedSongs = true; // marcar antes de await para evitar clics múltiples
-
-        li.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          const songs = await window.electronAPI.getXmasSongs(node.path);
-
-          playlist = songs.map(f => ({
-            name: f.split('\\').pop(), // solo nombre de archivo
-            path: f // ruta completa
-          }));
-
-          messageFromOpenByNode = true;
-          await loadPlaylistFromArray(songs, 'xmas-all', false, "cilckNodeXmas"); // cacheKey claro 'xmas-all'
-
-          window.electronAPI.selectXmas(node.path);
-
-          if (autoPlay && playlist.length > 0) playSong(0);
-        });
-      }
-    });
-    return li;
-  }
-
-  const ul = document.createElement('ul');
-  data.playlists.forEach(year => { ul.appendChild(createNode({ name: year.year, nodes: year.nodes })); });
-  ul.appendChild(createNode(data.xmas));
-  treeContainer.appendChild(ul);
-});
-
+  await refreshTree(); // Construir/refresh del árbol con la función nueva
+}
 
 // ---------------------------------------------------------------
 // Volume conection
@@ -582,19 +651,22 @@ function updateVolumeUI(volume) {
   btnMute.textContent = isMuted ? 'Unmute' : 'Mute';
 }
 
-// Listener para subir el volumen
-btnVolUp.addEventListener('click', () => {
+// Aplica el volumen a Wavesurfer si existe
+function applyVolume() {
+  if (wavesurfer) { wavesurfer.setVolume(isMuted ? 0 : currentVolume); }
+}
+
+function volumeUp() {
   currentVolume = Math.min(1, currentVolume + 0.1);
   if (!isMuted) applyVolume();
   updateVolumeUI(currentVolume);
-});
+}
 
-// Listener para bajar el volumen
-btnVolDown.addEventListener('click', () => {
+function volumeDown() {
   currentVolume = Math.max(0, currentVolume - 0.1);
   if (!isMuted) applyVolume();
   updateVolumeUI(currentVolume);
-});
+}
 
 // Mute / Unmute
 btnMute.addEventListener('click', () => {
@@ -623,16 +695,6 @@ volumeSlider.addEventListener('input', () => {
   // Actualizar label
   volumeLabel.textContent = `${volumeSlider.value}%`;
 });
-
-// Aplica el volumen a Wavesurfer si existe
-function applyVolume() {
-  if (wavesurfer) {
-    wavesurfer.setVolume(isMuted ? 0 : currentVolume);
-  }
-}
-
-// Inicializa el slider al cargar
-updateVolumeUI(defaultVol);
 
 
 // ##########################################
@@ -663,18 +725,10 @@ function formatTime(seconds, negative = false) {
   return (negative ? "-" : "") + `${mins}:${secs}`;
 }
 
+pitchSlider.addEventListener('input', (e) => updatePitch(e.target.value)); // slider controla
+pitchInput.addEventListener('change', (e) => updatePitch(e.target.value)); // input controla
+sliders.forEach((slider, i) => { slider.value = savedEqValues[i]; }); // Aplicar valores a sliders ahora
 
-// slider controla
-pitchSlider.addEventListener('input', (e) => updatePitch(e.target.value));
-
-// input controla
-pitchInput.addEventListener('change', (e) => updatePitch(e.target.value));
-
-
-// Aplicar valores a sliders inmediatamente
-sliders.forEach((slider, i) => {
-  slider.value = savedEqValues[i];
-});
 
 function crearVideoPlayer(url) {
   const container = document.getElementById('videoContainer');
@@ -929,6 +983,13 @@ window.electronAPI.onFileRenamed(async ({ oldPath, newPath }) => {
     document.title = formated_name;
     songPath = newPath;
   }
+
+  pushHistory({
+    type: 'renameFile',
+    timestamp: Date.now(),
+    data: { oldPath, newPath }
+  });
+
   loadPlaylistFromArray(playlist, pathFolder, true, "onFileRenamed"); // vuelve a renderizar
 });
 
@@ -1053,6 +1114,12 @@ window.electronAPI.onContextMenuAction(async (action) => {
     return;
   }
 
+  if (action.type === 'undo') {
+    // Deshacer la última acción
+    await undoLastAction();
+    return;
+  }
+
   switch (action.type) {
     case "copyName": {
       // copiar nombre (single)
@@ -1080,10 +1147,8 @@ window.electronAPI.onContextMenuAction(async (action) => {
         navigator.clipboard.writeText(action.files.join('\n'));
       }
       break;
-    case "undo":
-      // deshacer última operación
-      break;
   }
+  return;
 });
 
 
@@ -1094,11 +1159,8 @@ window.electronAPI.onContextMenuAction(async (action) => {
 // ##########################################
 
 // ---------------------------------------------------------------
-// move files opetations
+// move files opetations | Modal / Tree code
 // ---------------------------------------------------------------
-
-
-// ----------------- Modal / Tree code ---------------------------
 
 // Utility: detectar si crear/renombrar está bloqueado (misma regla que en main)
 function isCreateBlockedNodePath(nodePath) {
@@ -1107,11 +1169,7 @@ function isCreateBlockedNodePath(nodePath) {
   return base.includes('music.main') || base.includes('music.registry.base') || base.includes('music.xmas');
 }
 
-/**
- * "E:/_years/2004/01. folder" -> "01. folder"
- * @param {*} _path 
- * @returns First Level of the path
- */
+/** "E:/_years/2004/01. folder" -> "01. folder" */
 function processPath(_path) {
   // Separar por backslash o slash dependiendo del sistema
   const partes = _path.split(/[\\/]/);
@@ -1128,22 +1186,12 @@ function processPath(_path) {
   }
 }
 
-/**
- * "01. folder.example" -> "folder example"
- * @param {*} folderName
- * @returns name without prefix
- */
+/** "01. folder.example" -> "folder example" */
 function removePrefixFolder(folderName) {
   return folderName.replace(/^\d{2}\.\s/, '');
 }
 
-/**
- * Decide si estas carpetas pueden tener subcarpetas creadas por etudeplayer
- * @param {*} node 
- * @param {*} isCreating 
- * @param {*} isMenu 
- * @returns A bolean value
- */
+/** Decide si estas carpetas pueden tener subcarpetas creadas por etudeplayer */
 function isCreateBlocked(node, isCreating = false, isMenu = true) {
   if (!node || !node.path) return true; // sin path → no crear
   const name = removePrefixFolder(node.path.toLowerCase());
@@ -1247,6 +1295,7 @@ async function openMoveDialog(files = []) {
     stopFolderUpdate = true;
     await executePendingMovesAndSync();
     console.log('Moved to: "', selectedMoveNode.path, '" files:', filesToMove);
+
 
     selectedMoveNode = null;
     filesWhileRenaming = [];
@@ -1541,7 +1590,15 @@ window.electronAPI.onMoveTreeAction(async (action) => {
     const res = await window.electronAPI.createFolder({ parentPath: nodePath, folderName: finalName });
     if (!res || !res.success) {
       showProgressNotification('No se pudo crear la carpeta: ' + (res && res.error ? res.error : 'Error desconocido'), 1, true, 4000);
+      openMoveDialog(filesWhileRenaming);
       return;
+    }
+    if (res && res.success) {
+      pushHistory({
+        type: 'createFolder',
+        timestamp: Date.now(),
+        data: { folderPath: res.path }
+      });
     }
     openMoveDialog(filesWhileRenaming);
     return;
@@ -1554,15 +1611,25 @@ window.electronAPI.onMoveTreeAction(async (action) => {
     const currentBasename = nodePath.split(/[\\/]/).pop();
     const newName = await customPrompt('Nuevo nombre de carpeta:', currentBasename);
     if (!newName) return;
+
     const result = await window.electronAPI.renameFolder({ oldPath: nodePath, newName: newName.trim() });
     if (!result || !result.success) {
       showProgressNotification('No se pudo renombrar: ' + (result && result.error ? result.error : 'Error'), 1, true, 4000);
+      openMoveDialog(filesWhileRenaming);
       return;
     }
+
+    pushHistory({
+      type: 'renameFolder',
+      timestamp: Date.now(),
+      data: { oldPath: payload.oldPath, newPath: payload.newPath }
+    });
     openMoveDialog(filesWhileRenaming);
     return;
   }
+
 });
+
 
 // ----------------- Fin del modal -----------------------------
 
@@ -1658,9 +1725,7 @@ async function validateAndPrepareMove(files, destPath) {
   return { success: true, operations };
 }
 
-/**
- * Ejecutar las operaciones preparadas (ETAPA 3) y sincronizar UI/cache.
- */
+/** Ejecutar las operaciones preparadas (ETAPA 3) y sincronizar UI/cache. */
 async function executePendingMovesAndSync() {
   if (!Array.isArray(pendingMoveOperations) || pendingMoveOperations.length === 0) {
     console.error('No hay operaciones pendientes para ejecutar.');
@@ -1688,20 +1753,37 @@ async function executePendingMovesAndSync() {
   let moved = [];
   let failed = [];
   if (res && Array.isArray(res.results)) {
+
     moved = res.results.filter(r => r.success).map(r => r.src);
     failed = res.results.filter(r => !r.success);
+
   } else if (res && res.success === true && res.results) {
+
     moved = res.results.map(r => r.src);
+
   } else {
+
     // si res no tiene results pero indica error
     if (res && res.error) {
       showProgressNotification('Error moviendo archivos', 1, true, 4000);
-      alert(`Error moviendo archivos: ${res.error}`);
+      customAlert(`Error moviendo archivos: ${res.error}`);
     }
+
   }
 
+  // 4) Guardar en historia para deshacer
+  if (Array.isArray(pendingMoveOperations) && pendingMoveOperations.length) {
+    const histItem = {
+      type: 'move',
+      timestamp: Date.now(),
+      data: {
+        files: pendingMoveOperations.map(op => ({ oldPath: op.src, newPath: op.dest }))
+      }
+    };
+    pushHistory(histItem);
+  }
 
-  // (4 & 5) Actualizar cache y playlist
+  // 5) Actualizar cache y playlist
   if (Array.isArray(moved) && moved.length > 0 && Array.isArray(playlist)) {
     // 1) crear set de rutas movidas (normalizadas)
     const movedSet = new Set(moved.map(normalizePathForCompare));
@@ -1759,7 +1841,7 @@ async function executePendingMovesAndSync() {
 }
 
 // ------------------------------------------------------------
-// move to recicler bin
+// Move to recicler bin
 // ------------------------------------------------------------
 
 function generateCaptcha(len = 6) {
@@ -1769,7 +1851,7 @@ function generateCaptcha(len = 6) {
   return s;
 }
 
-ReBinBtn.addEventListener('click', async () => {
+openReBinBtn.addEventListener('click', async () => {
   showProgressNotification('Abriendo papelera...', 0);
   const res = await window.electronAPI.openTrashFolder();
   if (res && res.success) {
@@ -1847,7 +1929,18 @@ async function executeMoveToTrash(action) {
       failed = res.results.filter(r => !r.success);
     } else if (res && res.success === false && res.error) {
       showProgressNotification('Error moviendo a la papelera', 1, true, 4000);
-      alert('Error moviendo archivos a la papelera:\n' + res.error);
+      customAlert('Error moviendo archivos a la papelera:\n' + res.error);
+    }
+
+    if (res && Array.isArray(res.results) && res.results.length) {
+      const histItem = {
+        type: 'moveToTrash',
+        timestamp: Date.now(),
+        data: {
+          files: res.results.map(r => ({ oldPath: r.src, newPath: r.dest }))
+        }
+      };
+      pushHistory(histItem);
     }
 
     // 7) Quitar movidos de playlist y recargar carpeta actual (sin updatePlaylistUI directo)
@@ -1886,6 +1979,527 @@ async function executeMoveToTrash(action) {
 
 }
 
+// ------------------------------------------------------------
+// Deshacer acciones de operaciones de archivos
+// ------------------------------------------------------------
+
+function pushHistory(item) {
+  // item: { type, timestamp, data }
+  historyStack.push(item);
+  console.log('history push:', item);
+}
+
+/** Helper: normalizar path para comparación (windows/unix) */ 
+function normalizePathForCompare(p) {
+  if (!p || typeof p !== 'string') return '';
+  return p.replace(/\//g, '\\').toLowerCase();
+}
+
+function dirnameOf(p) {
+  if (!p || typeof p !== 'string') return '';
+  const pos = Math.max(p.lastIndexOf('\\'), p.lastIndexOf('/'));
+  if (pos === -1) return '';
+  return p.substring(0, pos);
+}
+
+function basenameOf(p) {
+  if (!p || typeof p !== 'string') return '';
+  const pos = Math.max(p.lastIndexOf('\\'), p.lastIndexOf('/'));
+  return pos === -1 ? p : p.substring(pos + 1);
+}
+
+// Recarga la playlist actual desde disco usando getSongs + loadPlaylistFromArray
+async function refreshPlaylistAfterUndo() {
+  try {
+    // Si hay carpeta abierta en UI, recargar desde disco (fuente de verdad)
+    if (currentOpenFolder && typeof currentOpenFolder === 'string') {
+      const filenames = await window.electronAPI.getSongs(currentOpenFolder); // devuelve array de names
+      if (!Array.isArray(filenames)) {
+        // fallback: si falla la lectura, no tocar UI fuertemente
+        console.warn('refreshPlaylistAfterUndo: getSongs devolvió no-array');
+        return;
+      }
+      const songsArray = filenames.map(fn => ({ name: fn, path: `${currentOpenFolder}\\${fn}` }));
+      // Forzar recalculo y cache con force=true
+      await loadPlaylistFromArray(songsArray, currentOpenFolder, true);
+      return;
+    }
+
+    // Si no hay carpeta abierta, reconstruir desde playlist en memoria (si existe)
+    if (Array.isArray(playlist) && playlist.length > 0) {
+      const songsArray = playlist.map(it => ({ name: it.name, path: it.path }));
+      await loadPlaylistFromArray(songsArray, currentOpenFolder || null, true);
+      return;
+    }
+
+    // Si no hay nada, dejar playlist vacía (UI mínima)
+    playlist = [];
+    try { updatePlaylistUI(); } catch (e) { /* última opción */ console.warn('refreshPlaylistAfterUndo: updatePlaylistUI fallback', e); }
+  } catch (err) {
+    console.error('refreshPlaylistAfterUndo error:', err);
+    // fallback suave
+    try { updatePlaylistUI(); } catch (e) { /* ignore */ }
+  }
+}
+
+
+async function undoLastAction() {
+  if (!Array.isArray(historyStack) || historyStack.length === 0) {
+    showProgressNotification('No hay acciones para deshacer', 1, true, 2500);
+    return;
+  }
+
+  const last = historyStack[historyStack.length - 1]; // Peek, no pop aún
+  if (!last || !last.type) {
+    historyStack.pop();
+    showProgressNotification('Registro de historial inválido, eliminado', 1, true, 2500);
+    return;
+  }
+
+  try {
+    // Desactivar watchdog local y remoto mientras hacemos undo
+    disableWatchdog = true;
+    stopFolderUpdate = true;
+    try { await window.electronAPI.setWatchdog(false); } catch (e) { /* ignore */ }
+
+    switch (last.type) {
+      // ---------- CREATE FOLDER ----------
+      case 'createFolder': {
+        const folderPath = last.data && last.data.folderPath;
+        if (!folderPath) {
+          // pop y avisar
+          historyStack.pop();
+          showProgressNotification('Registro de carpeta inválido eliminado', 1, true, 2500);
+          break;
+        }
+
+        const exists = await window.electronAPI.pathExists(folderPath);
+        if (!exists) {
+          // si no existe ya, quitar registro y avisar
+          historyStack.pop();
+          showProgressNotification('Carpeta ya no existe. Registro eliminado.', 1, true, 3000);
+          break;
+        }
+
+        const files = await window.electronAPI.readFolderFiles(folderPath);
+        if (files === null) {
+          // error leyendo -> borrar TODO el historial (regla 5)
+          historyStack = [];
+          showProgressNotification('Error accediendo a la carpeta. Historial borrado.', 1, true, 4000);
+          break;
+        }
+
+        if (files.length > 0) {
+          // Si no está vacía => borrar todo el historial completo (según regla)
+          historyStack = [];
+          showProgressNotification('La carpeta no está vacía: historial borrado por seguridad.', 1, true, 5000);
+          break;
+        }
+
+        // Si está vacía -> eliminar la carpeta
+        const rm = await window.electronAPI.removeFolder(folderPath);
+        if (rm && rm.success) {
+          historyStack.pop();
+          showProgressNotification('Carpeta creada eliminada (undo).', 1, false, 2500);
+        } else {
+          // si no se puede eliminar, borrar todo el historial por seguridad
+          historyStack = [];
+          showProgressNotification('No se pudo eliminar la carpeta. Historial borrado.', 1, true, 5000);
+        }
+
+        break;
+      }
+
+      // ---------- MOVE ----------
+      case 'move': {
+        // last.data.files: [{ oldPath, newPath }, ...]
+        const files = (last.data && Array.isArray(last.data.files)) ? last.data.files.slice() : [];
+        if (!files.length) {
+          historyStack.pop();
+          showProgressNotification('No hay rutas para revertir', 1, true, 2500);
+          break;
+        }
+
+        // Preparar operaciones solo para los archivos que EXISTEN en newPath
+        const ops = [];
+        const missing = [];
+        const dirsToEnsure = new Set();
+
+        for (const f of files) {
+          const srcExists = await window.electronAPI.pathExists(f.newPath);
+          if (srcExists) {
+            ops.push({ src: f.newPath, dest: f.oldPath });
+            const d = dirnameOf(f.oldPath);
+            if (d) dirsToEnsure.add(d);
+          } else {
+            missing.push(f);
+          }
+        }
+
+        if (ops.length === 0) {
+          // nada que deshacer físicamente; quitar registro y avisar
+          historyStack.pop();
+          const msg = missing.map(m => m.oldPath).join('\n') || 'No se encontraron archivos a revertir';
+          showProgressNotification('No fue posible revertir (archivos no encontrados)', 1, true, 5000);
+          customAlert('No se pudieron revertir (archivos no encontrados):\n' + msg);
+          break;
+        }
+
+        // Asegurar directorios destino (oldPath parents)
+        for (const d of Array.from(dirsToEnsure)) {
+          await window.electronAPI.ensureDir(d);
+        }
+
+        // Ejecutar movimientos (usar executeMoveOperations en main)
+        showProgressNotification('Revirtiendo movimiento...', 0);
+        const res = await window.electronAPI.executeMoveOperations(ops);
+
+        // Procesar resultados
+        const results = (res && Array.isArray(res.results)) ? res.results : [];
+        const succeeded = results.filter(r => r.success).map(r => r.dest); // moved back to dest=oldPath
+        const failed = results.filter(r => !r.success);
+
+        // Actualizar UI: recargar carpeta actual para que permanezca como antes
+        // try {
+        //   if (currentOpenFolder) {
+        //     showProgressNotification('Actualizando vista...', 0);
+        //     await loadPlaylistFromFolder(currentOpenFolder);
+        //   }
+        // } catch (e) { console.warn('Error recargando carpeta tras undo move:', e); }
+
+        // REFRESCAR playlist usando el helper (no updatePlaylistUI directa)
+        historyStack.pop();
+        await refreshPlaylistAfterUndo();
+
+        // Publicar notificaciones y limpiar historial (pop)
+        if (failed.length > 0 || missing.length > 0) {
+          const failList = failed.map(f => `${f.src} — ${f.error || 'error'}`).concat(missing.map(m => `${m.newPath} — no encontrado`));
+          showProgressNotification(`Revertido parcialmente. Fallidos: ${failed.length + missing.length}`, 1, true, 6000);
+          customAlert('No se pudieron revertir:\n\n' + failList.join('\n'));
+        } else {
+          showProgressNotification('Movimiento revertido correctamente', 1, false, 3000);
+        }
+
+        break;
+      }
+
+      // ---------- MOVE TO TRASH ----------
+      case 'moveToTrash': {
+        const files = (last.data && Array.isArray(last.data.files)) ? last.data.files.slice() : [];
+        if (!files.length) {
+          historyStack.pop();
+          showProgressNotification('No hay rutas en el registro', 1, true, 2500);
+          break;
+        }
+
+        const ops = [];
+        const missing = [];
+        const dirsToEnsure = new Set();
+
+        for (const f of files) {
+          const inTrashExists = await window.electronAPI.pathExists(f.newPath);
+          if (inTrashExists) {
+            ops.push({ src: f.newPath, dest: f.oldPath }); // nuevo -> antiguo
+            const d = dirnameOf(f.oldPath);
+            if (d) dirsToEnsure.add(d);
+          } else {
+            missing.push(f);
+          }
+        }
+
+        if (ops.length === 0) {
+          historyStack.pop();
+          showProgressNotification('No se encontraron archivos en la papelera para revertir', 1, true, 3500);
+          break;
+        }
+
+        for (const d of Array.from(dirsToEnsure)) {
+          await window.electronAPI.ensureDir(d);
+        }
+
+        showProgressNotification('Revirtiendo desde papelera...', 0);
+        const res = await window.electronAPI.executeMoveOperations(ops);
+
+        const results = (res && Array.isArray(res.results)) ? res.results : [];
+        const failed = results.filter(r => !r.success);
+
+        // Recargar carpeta actual para actualizar vista
+        // try {
+        //   if (currentOpenFolder) {
+        //     await loadPlaylistFromFolder(currentOpenFolder);
+        //   }
+        // } catch (e) { console.warn('Error recargando carpeta tras undo moveToTrash:', e); }
+
+        // REFRESCAR playlist usando el helper (no updatePlaylistUI directa)
+        historyStack.pop();
+        await refreshPlaylistAfterUndo();
+
+        if (failed.length > 0 || missing.length > 0) {
+          const failList = failed.map(f => `${f.src} — ${f.error || 'error'}`).concat(missing.map(m => `${m.newPath} — no encontrado`));
+          showProgressNotification(`Revertido parcialmente desde papelera. Fallidos: ${failed.length + missing.length}`, 1, true, 6000);
+          customAlert('No se pudieron revertir desde papelera:\n\n' + failList.join('\n'));
+        } else {
+          showProgressNotification('Archivos restaurados desde papelera', 1, false, 3000);
+        }
+
+        break;
+      }
+
+      // ---------- RENAME FILE ----------
+      case 'renameFile': {
+        const { oldPath, newPath } = last.data || {};
+        if (!oldPath || !newPath) {
+          historyStack.pop();
+          showProgressNotification('Registro inválido, eliminado', 1, true, 2500);
+          break;
+        }
+
+        const newExists = await window.electronAPI.pathExists(newPath);
+        if (!newExists) {
+          // eliminar solo el registro (según regla)
+          historyStack.pop();
+          showProgressNotification('No se encontró el archivo para revertir. Registro eliminado.', 1, true, 3500);
+          break;
+        }
+
+        // Si oldPath ya existe -> generar sufijo (2)
+        let target = oldPath;
+        if (await window.electronAPI.pathExists(oldPath)) {
+          const base = basenameOf(oldPath);
+          const dot = base.lastIndexOf('.');
+          const baseNoExt = dot >= 0 ? base.substring(0, dot) : base;
+          const ext = dot >= 0 ? base.substring(dot) : '';
+          const parent = dirnameOf(oldPath);
+          let counter = 2;
+          let candidate;
+          do {
+            candidate = `${baseNoExt} (${counter})${ext}`;
+            target = parent + '\\' + candidate;
+            counter++;
+          } while (await window.electronAPI.pathExists(target));
+        }
+
+        // Intentar renombrar newPath -> target
+        const ren = await window.electronAPI.renamePath(newPath, target);
+        if (ren && ren.success) {
+
+          // Actualizar UI si corresponde
+          // try { if (currentOpenFolder) await loadPlaylistFromFolder(currentOpenFolder); } catch (e) { console.warn('Error recargando playlist tras undo renameFile:', e); }
+          historyStack.pop();
+          await refreshPlaylistAfterUndo();
+          showProgressNotification('Cambio de nombre revertido', 1, false, 3000);
+        } else {
+          // si falla: eliminar registro y avisar
+          historyStack.pop();
+          showProgressNotification('No se pudo revertir el nombre del archivo. Registro eliminado.', 1, true, 4000);
+        }
+
+        break;
+      }
+
+      // ---------- RENAME FOLDER ----------
+      case 'renameFolder': {
+        const { oldPath, newPath } = last.data || {};
+        if (!oldPath || !newPath) {
+          historyStack.pop();
+          showProgressNotification('Registro inválido, eliminado', 1, true, 2500);
+          break;
+        }
+
+        const newExists = await window.electronAPI.pathExists(newPath);
+        if (!newExists) {
+          // eliminar solo ese registro
+          historyStack.pop();
+          showProgressNotification('La carpeta actual no existe. Registro eliminado.', 1, true, 3500);
+          break;
+        }
+
+        // Si oldPath ya existe, aplicar sufijo (2)
+        let target = oldPath;
+        if (await window.electronAPI.pathExists(oldPath)) {
+          const base = basenameOf(oldPath);
+          const parent = dirnameOf(oldPath);
+          let counter = 2;
+          let candidate;
+          do {
+            candidate = `${base} (${counter})`;
+            target = parent + '\\' + candidate;
+            counter++;
+          } while (await window.electronAPI.pathExists(target));
+        }
+
+        const ren = await window.electronAPI.renamePath(newPath, target);
+        if (ren && ren.success) {
+          // Intentar refrescar el árbol y la carpeta actual
+          try {
+            // Forzamos recarga de playlists y árbol para reflejar renombrado de carpetas
+            // (intentamos recargar la estructura sin recargar app completa)
+            try {
+              // const data = await window.electronAPI.getPlaylists();
+              // Re-render tree quickly (we have a refresh function? if not, reload)
+              // Si tienes una función refreshTree(), llámala aquí. Si no -> recarga la UI completa:
+              // fallback: location.reload();
+              // if (typeof refreshTree === 'function') {
+              //   await refreshTree();
+              // } else {
+              //   // Fallback: recargar la página para evitar inconsistencias
+              //   location.reload();
+              // }
+              
+              
+
+            } catch (e) {
+              console.warn('No se pudo refrescar árbol tras undo renameFolder:', e);
+              location.reload();
+            }
+          } catch (e2) { /* ignore */ }
+
+          historyStack.pop();
+          showProgressNotification('Renombrado de carpeta revertido', 1, false, 3000);
+        } else {
+          historyStack.pop();
+          showProgressNotification('No se pudo revertir el renombrado de carpeta. Registro eliminado.', 1, true, 4000);
+        }
+
+        break;
+      }
+
+      default:
+        historyStack.pop();
+        showProgressNotification('Tipo de operación no soportado para undo. Registro eliminado.', 1, true, 3000);
+        break;
+    }
+
+  } catch (err) {
+    console.error('Error durante undo:', err);
+    // En caso de error inesperado, por seguridad vaciamos el historial
+    historyStack = [];
+    showProgressNotification('Error inesperado. Historial borrado.', 1, true, 5000);
+  } finally {
+    // Reactivar watchers
+    disableWatchdog = false;
+    setTimeout(() => {
+      stopFolderUpdate = false
+    }, 6000);
+    try { await window.electronAPI.setWatchdog(true); } catch (e) { /* ignore */ }
+  }
+}
+
+// -------------------------------------------------------------------------
+// Global keyshortcuts
+// -------------------------------------------------------------------------
+
+// ----------------- Shortcuts handler (renderer) -----------------
+window.electronAPI.onShortcutAction(async ({ action } = {}) => {
+  if (!action) return;
+
+  // Helpers
+  function clamp(v, a = 0, b = 1) { return Math.max(a, Math.min(b, v)); }
+
+  // Seek relative seconds (positive or negative)
+  function seekRelativeSeconds(sec) {
+    try {
+      if (!wavesurfer) return;
+      const total = wavesurfer.getDuration() || 0;
+      if (total <= 0) return;
+      const current = wavesurfer.getCurrentTime() || 0;
+      let target = current + sec;
+      if (target < 0) target = 0;
+      if (target > total) target = total;
+      wavesurfer.seekTo(total > 0 ? target / total : 0);
+      // update labels (audioprocess will update, but do immediate update)
+      currentDurLabel.textContent = formatTime(target);
+      leftDurLabel.textContent = formatTime(total - target, true);
+    } catch (e) { console.warn('seekRelativeSeconds error', e); }
+  }
+
+  function changeVolumeBy(delta) {
+    currentVolume = clamp(currentVolume + delta, 0, 1);
+    isMuted = false;
+    applyVolume();
+    updateVolumeUI(currentVolume);
+    // persist new default? we won't auto persist, just keep for session.
+  }
+
+  function playRandomSong() {
+    try {
+      if (!Array.isArray(playlist) || playlist.length === 0) return;
+      let idx = Math.floor(Math.random() * playlist.length);
+      // avoid same song when possible
+      if (playlist.length > 1 && idx === currentSongIndex) {
+        idx = (idx + 1) % playlist.length;
+      }
+      currentSongIndex = idx;
+      playSong(idx);
+    } catch (e) { console.warn('playRandomSong error', e); }
+  }
+
+  // Action dispatch
+  switch (action) {
+    case 'seekBack10':
+      seekRelativeSeconds(-10);
+      break;
+    case 'seekForward10':
+      seekRelativeSeconds(10);
+      break;
+    case 'nextSong':
+      if (playlist.length === 0) break;
+      currentSongIndex = (currentSongIndex + 1) % playlist.length;
+      playSong(currentSongIndex);
+      break;
+    case 'previousSong':
+      if (playlist.length === 0) break;
+      currentSongIndex = (currentSongIndex - 1 + playlist.length) % playlist.length;
+      playSong(currentSongIndex);
+      break;
+    case 'playPause':
+      playSongBtn();
+      break;
+    case 'playRandom':
+      playRandomSong();
+      break;
+    case 'volumeUp':
+      changeVolumeBy(0.05);
+      break;
+    case 'volumeDown':
+      changeVolumeBy(-0.05);
+      break;
+    case 'stopSong':
+      // stop and reset to 0
+      if (wavesurfer) {
+        try { wavesurfer.stop(); wavesurfer.seekTo(0); } catch (e) { /* ignore */ }
+      }
+      document.title = originalTitle;
+      statusBar.textContent = originalTitle;
+      clearPlayingStyle();
+      break;
+    default:
+      // unknown action — ignore silently
+      console.warn('Unknown shortcut action:', action);
+      break;
+  }
+});
+
+
+// -------------------------------------------------------------
+// Listeners del playback, controles y DOM
+// -------------------------------------------------------------
+
+window.addEventListener('DOMContentLoaded', async () => { initializeSavedCache() });
+window.addEventListener('beforeunload', () => { saveCachePlaylist(); });
+//randBtn.addEventListener('click', () => { playRandomSong(); }); //numkey8
+prevBtn.addEventListener('click', () => { prevSongBtn(); });      //numkey4
+nextBtn.addEventListener('click', () => { nextSongBtn(); });      //numkey2
+playPauseBtn.addEventListener('click', () => { playSongBtn(); }); //numkey5
+stopBtn.addEventListener('click', () => { stopSong(); });         //numkey0
+btnVolUp.addEventListener('click', () => { volumeUp(); });        //numkey9
+btnVolDown.addEventListener('click', () => { volumeDown() });     //numkey7
+//back10sBtn.addEventListener('click', () => { backTnSec(); });   //numkey1
+//ahead10sBtn.addEventListener('click', () => { aheadTnSec(); }); //numkey3
+// ...minimize or active window ................................. //numkey6
+
+updateVolumeUI(defaultVol); //inicializar volumen
+window.refreshTree = refreshTree; // expose globally (optional) so other modules can call refreshTree()
 
 
 // ##########################################

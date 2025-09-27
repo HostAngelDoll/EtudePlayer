@@ -186,6 +186,43 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }
   },
 
+  // ----------------------------------------------------------------------------
+  // Crear directorio recursivamente (mkdir -p)
+  ensureDir: async (dirPath) => {
+    try {
+      return await ipcRenderer.invoke('ensure-dir', dirPath);
+    } catch (err) {
+      console.error('ensureDir error:', err);
+      return { success: false, error: err && err.message ? err.message : String(err) };
+    }
+  },
+
+  // Eliminar carpeta (solo si está vacía)
+  removeFolder: async (folderPath) => {
+    try {
+      return await ipcRenderer.invoke('remove-folder', folderPath);
+    } catch (err) {
+      console.error('removeFolder error:', err);
+      return { success: false, error: err && err.message ? err.message : String(err) };
+    }
+  },
+
+  // Renombrar usando rutas completas
+  renamePath: async (oldPath, newPath) => {
+    try {
+      return await ipcRenderer.invoke('rename-path', { oldPath, newPath });
+    } catch (err) {
+      console.error('renamePath error:', err);
+      return { success: false, error: err && err.message ? err.message : String(err) };
+    }
+  },
+
+  // Notificar shortcuts (renderer recibe acciones)
+  onShortcutAction: (callback) => {
+    ipcRenderer.removeAllListeners('shortcut-action');
+    ipcRenderer.on('shortcut-action', (event, payload) => callback(payload));
+  },
+
 });
 
 // ##########################################

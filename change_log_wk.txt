@@ -28,62 +28,11 @@ List:
 ------------------------------------------------------------------------------------------------
 
 
-🟢 Funcionalidades en playlist en orden:
-
-  - ✅ Menu contextual
-  - ✅ Renombrado (dialogo y funciones)
-    - ✅ mecanismo de cambiar el nombre al archivo
-    - ✅ un dialog con un input para cambiar el nombre al archivo (botones ok y cancelar)
-
-  - ✅ Copiar nombres y rutas al portapapeles
-
-  - ✅ Mover elementos
-    - ✅ dialogo de mover
-    - ✅ modificar nombre de carpetas en el dialogo
-    - ✅ verificacion antes de mover archivos
-    - ✅ mecanica para mover archivos 
-      - ✅ mover archivos a carpetas de destino
-      - ✅ quitar de la playlist lo que se movio
-
-  - ✅ Mover a papelera ("E:/_Exclude/l_reallydeleted") con captcha
-    - ✅ Mover archivos a una papelera
-    - ✅ Pedir al usuario con customPrompt una palabra clave
-    - ✅ Un boton en el index para abrir la carpeta papelera con el explorador de archivos
-  
-  - ✅ Una opcion en el context menu de una cancion selecionada para abrir la ubicacion de la cancion en el explorador
-
-  - Guardar historial de movimientos para poder desahcer
-    - Contar con logica para desahcer operaciones de archivo
-    - Funcion para desahcer movimientos:
-      - creacion de carpetas
-        - se supone que estan vacias para hacer eso
-        - si hay archivos el historial se borra
-      - movida de archivos y movida a papelera
-        - se supone que el directorio antiguo sigue existiendo
-        - si no se crea el directorio en donde existia
-      - cambios de nombres en los archivos
-        - se supone que el archivo sigue existiendo
-        - de lo contrario el historial se borra
-      - cambios de nombres en las carpetas
-        - se supone que la carpeta con su nombre actual existiendo
-        - de lo contrario se borra el historial
-
-  - Global Keyboard shortcuts
-    - Configurable desde un json
-      - Num1 back 10 seconds playback
-      - Num2 next song
-      - Num3 ahead 10 seconds playback
-      - Num4 previous
-      - Num5 play/pause
-      - Num6 Activate/minimize window
-      - Num7 volume down
-      - Num8 random song in playlist
-      - Num9 volume up
-
   - Estirilizado final de etude player
     - icono en escritorio
     - implementacion de barra de status y barra de playback con waveseekbar
     - ... proximamente más detalles ...
+
 
 ------------------------------------------------------------------------------------------------
 
@@ -174,6 +123,66 @@ List:
     - se glichea mucho la notificacion tooltipo donde se ejecutan funciones de actualizado de cache y varios listeners de actualizado se ejectuan simultaneamente causando glicheo en la tooltip de notificaciones.
     - lo que escribo antes fueron de los varios reintentos de implentacion de codigo que te he pedido antes y fue frustrante ver esos bugs
   - nota: ya vistes lo que ya esta implementado por lo tanto no reinventes la rueda, ok? piensa más tiempo porfa
+
+
+✅ Funcionalidades en playlist en orden:
+
+  - ✅ Menu contextual
+  - ✅ Renombrado (dialogo y funciones)
+    - ✅ mecanismo de cambiar el nombre al archivo
+    - ✅ un dialog con un input para cambiar el nombre al archivo (botones ok y cancelar)
+
+  - ✅ Copiar nombres y rutas al portapapeles
+
+  - ✅ Mover elementos
+    - ✅ dialogo de mover
+    - ✅ modificar nombre de carpetas en el dialogo
+    - ✅ verificacion antes de mover archivos
+    - ✅ mecanica para mover archivos 
+      - ✅ mover archivos a carpetas de destino
+      - ✅ quitar de la playlist lo que se movio
+
+  - ✅ Mover a papelera ("E:/_Exclude/l_reallydeleted") con captcha
+    - ✅ Mover archivos a una papelera
+    - ✅ Pedir al usuario con customPrompt una palabra clave
+    - ✅ Un boton en el index para abrir la carpeta papelera con el explorador de archivos
+  
+  - ✅ Una opcion en el context menu de una cancion selecionada para abrir la ubicacion de la cancion en el explorador
+
+  - ✅ Guardar historial de movimientos para poder desahcer
+    - ✅ Contar con logica para desahcer operaciones de archivo
+    - ✅ movida de archivos, renombres de archivo, movida a la papelera
+      - ✅ actualizar playlist y cache como al mover y renombrar archivos
+    - ✅ Funcion para desahcer movimientos:
+      - ✅ creacion de carpetas
+        - se supone que estan vacias para hacer eso
+        - si hay archivos el historial se borra
+      - ✅ movida de archivos y movida a papelera
+        - se supone que el directorio antiguo sigue existiendo
+        - si no se crea el directorio en donde existia
+      - ✅ cambios de nombres en los archivos
+        - se supone que el archivo sigue existiendo
+        - de lo contrario el historial se borra
+      - ✅ cambios de nombres en las carpetas
+        - se supone que la carpeta con su nombre actual existiendo
+        - de lo contrario se borra el historial
+
+  - ✅ Global Keyboard shortcuts
+    - ✅ Configurable desde un json
+    - ✅ todas las teclas ya fueron incluidas
+      - ctrl + num1 back 10 seconds playback (*)
+      - ctrl + num2 next song
+      - ctrl + num3 ahead 10 seconds playback (*)
+      - ctrl + num4 previous
+      - ctrl + num5 play/pause
+      - ctrl + num6 Activate/minimize window etudeplayer (*)
+      - ctrl + num7 volume down
+      - ctrl + num8 play random song in playlist (*)
+      - ctrl + num9 volume up
+      - ctrl + num0 Stop Song
+    - ✅ verificar (*) funciones no implementada en renderer.js o en main.js
+    - ✅ mensaje de aviso si interfiere un programa como el jubilado foobar2000
+
 
 
 ------------------------------------------------------------------------------------------------

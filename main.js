@@ -1,5 +1,5 @@
 // main.js
-const { app, BrowserWindow, ipcMain, Menu, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, dialog, shell, globalShortcut } = require('electron');
 const path = require('path');
 const fs = require('fs').promises;
 const chokidar = require("chokidar");
@@ -8,6 +8,9 @@ const XMAS_START_YEAR = 2004;
 const XMAS_END_YEAR = 2021;
 const ROOT_YEARS_PATH = "E:\\_Internal";
 const TRASH_FOLDER = "E:\\_Exclude\\l_reallydeleted";
+const SHORTCUTS_PATH = path.join(process.cwd(), 'shortcuts.json'); // raíz del proyecto
+let shortcutsWatcher = null;
+let registeredShortcuts = new Map(); // accelerator -> action
 let watchers = new Map();
 let watchdogEnabled = true; // --- WATCHDOG GLOBAL (activar/desactivar notificaciones de watchers) ---
 let win;
@@ -539,7 +542,6 @@ async function ensureTrashFolder() {
 }
 ensureTrashFolder().catch(() => {});
 
-
 // ----------------------
 // Move to trash (ETAPA bin)
 // ----------------------
@@ -616,11 +618,6 @@ ipcMain.handle('move-to-trash', async (event, { files } = {}) => {
   return { success: true, results };
 });
 
-
-// ----------------------
-// Abrir carpeta papelera en explorador
-// ----------------------
-
 ipcMain.handle('open-trash-folder', async () => {
   try {
     await shell.openPath(TRASH_FOLDER);
@@ -633,6 +630,7 @@ ipcMain.handle('open-trash-folder', async () => {
 // --------------------
 // Reveal in folder (abrir explorador y seleccionar archivo)
 // --------------------
+
 ipcMain.handle('reveal-in-folder', async (event, filePath) => {
   try {
     if (!filePath || typeof filePath !== 'string') {
@@ -658,13 +656,231 @@ ipcMain.handle('reveal-in-folder', async (event, filePath) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// Undo file operations
+// ---------------------------------------------------------------------------
+
+// -------------- IPC utilitarios para undo (main) ----------------
+
+// Asegurar que un directorio exista (mkdir -p)
+ipcMain.handle('ensure-dir', async (event, dirPath) => {
+  try {
+    if (!dirPath || typeof dirPath !== 'string') return { success: false, error: 'invalid path' };
+    await fs.mkdir(dirPath, { recursive: true });
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err && err.message ? err.message : String(err) };
+  }
+});
+
+// Eliminar carpeta (se usará para eliminar carpetas vacías)
+ipcMain.handle('remove-folder', async (event, folderPath) => {
+  try {
+    if (!folderPath || typeof folderPath !== 'string') return { success: false, error: 'invalid path' };
+    // Intentar eliminar (solo funcionará si está vacía)
+    await fs.rmdir(folderPath);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err && err.message ? err.message : String(err) };
+  }
+});
+
+// Renombrar de forma directa: oldPath -> newPath (paths completos)
+ipcMain.handle('rename-path', async (event, { oldPath, newPath } = {}) => {
+  try {
+    if (!oldPath || !newPath) return { success: false, error: 'invalid args' };
+    await fs.rename(oldPath, newPath);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err && err.message ? err.message : String(err) };
+  }
+});
+
+
+// ------------------------------------------------------------------------------
+// Global key
+// ------------------------------------------------------------------------------
+
+// Convertir 'ctrl+1' -> 'CommandOrControl+1' (más robusto)
+function normalizeAccel(raw) {
+  if (!raw || typeof raw !== 'string') return null;
+  const parts = raw.split('+').map(p => p.trim().toLowerCase()).filter(Boolean);
+  if (!parts.length) return null;
+  const mapped = parts.map(p => {
+    if (p === 'ctrl' || p === 'control' || p === 'cmd' || p === 'command') return 'CommandOrControl';
+    if (p === 'shift') return 'Shift';
+    if (p === 'alt' || p === 'option') return 'Alt';
+    if (p === 'super' || p === 'win' || p === 'meta') return 'Super';
+
+    // Mantener teclas del teclado numérico en minúscula (num0-num9)
+    if (p.startsWith('num') && p.length > 3) return p;
+
+    // Letras individuales en mayúscula
+    if (p.length === 1 && /[a-z]/.test(p)) return p.toUpperCase();
+
+    // Números individuales (0-9) se quedan igual
+    if (p.length === 1 && /[0-9]/.test(p)) return p;
+
+    // F1-F12 u otras teclas especiales
+    return p.toUpperCase();
+  });
+  return mapped.join('+');
+}
+
+async function registerShortcutsFromMap(map) {
+  try {
+    globalShortcut.unregisterAll();
+    registeredShortcuts.clear();
+
+    const seenAccels = new Set();
+    const failedAccels = [];
+
+    for (const rawKey of Object.keys(map || {})) {
+      const action = map[rawKey];
+      const accel = normalizeAccel(rawKey);
+      if (!accel) {
+        console.warn(`[shortcuts] clave inválida "${rawKey}" — omitida`);
+        continue;
+      }
+      if (seenAccels.has(accel)) {
+        console.warn(`[shortcuts] acelerador duplicado "${accel}" — omitido`);
+        continue;
+      }
+      const ok = globalShortcut.register(accel, () => {
+        handleGlobalShortcut(action);
+      });
+      if (!ok) {
+        console.warn(`[shortcuts] fallo al registrar "${accel}" -> "${action}"`);
+        failedAccels.push(accel);
+        continue;
+      }
+      seenAccels.add(accel);
+      registeredShortcuts.set(accel, action);
+      console.log(`[shortcuts] registrado: ${accel} -> ${action}`);
+    }
+
+    // Si fallaron todas
+    if (Object.keys(map).length > 0 && registeredShortcuts.size === 0) {
+      const result = await dialog.showMessageBox({
+        type: 'warning',
+        buttons: ['Reintentar', 'Continuar sin teclas', 'Cancelar'],
+        defaultId: 0,
+        cancelId: 2,
+        title: 'Error al registrar teclas',
+        message: 'No se pudieron registrar las teclas. Puede que otra aplicación esté interfiriendo.',
+        detail: '¿Desea cerrar la aplicación que interfiere y reintentar?\n\n"Continuar sin teclas" desactivará los atajos globales.\n"Cancelar" cerrará la aplicación.',
+        noLink: true,
+      });
+
+      if (result.response === 0) {
+        // Reintentar
+        registerShortcutsFromMap(map);
+      } else if (result.response === 1) {
+        // Continuar sin teclas
+        console.warn('[shortcuts] Continuando sin teclas registradas');
+      } else {
+        // Cancelar
+        console.warn('[shortcuts] Usuario canceló — cerrando aplicación');
+        app.quit();
+      }
+    }
+  } catch (err) {
+    console.error('[shortcuts] error en registerShortcutsFromMap:', err);
+  }
+}
+
+function handleGlobalShortcut(action) {
+  try {
+    if (!action || typeof action !== 'string') return;
+    if (action === 'toggleWindow') {
+      if (!win || win.isDestroyed()) {
+        const w = BrowserWindow.getAllWindows()[0];
+        if (w) {
+          win = w;
+        } else {
+          return;
+        }
+      }
+      if (win.isMinimized()) {
+        win.restore();
+        win.focus();
+      } else {
+        if (win.isFocused()) {
+          win.minimize();
+        } else {
+          if (!win.isVisible()) win.show();
+          win.focus();
+        }
+      }
+      return;
+    }
+    if (win && win.webContents) {
+      win.webContents.send('shortcut-action', { action });
+    } else {
+      const w = BrowserWindow.getAllWindows()[0];
+      if (w && w.webContents) w.webContents.send('shortcut-action', { action });
+    }
+  } catch (err) {
+    console.error('handleGlobalShortcut error:', err);
+  }
+}
+
+async function loadShortcutsFileAndRegister() {
+  try {
+    let raw = '{}';
+    try {
+      raw = await fs.readFile(SHORTCUTS_PATH, 'utf8');
+    } catch (e) {
+      console.warn(`[shortcuts] ${SHORTCUTS_PATH} no encontrado — sin atajos registrados`);
+      return;
+    }
+    let parsed = {};
+    try {
+      parsed = JSON.parse(raw);
+    } catch (e) {
+      console.warn('[shortcuts] JSON inválido en shortcuts.json — ignorado');
+      return;
+    }
+    registerShortcutsFromMap(parsed);
+  } catch (err) {
+    console.error('[shortcuts] error en loadShortcutsFileAndRegister:', err);
+  }
+}
+
+function watchShortcutsFile() {
+  try {
+    if (shortcutsWatcher) {
+      try { shortcutsWatcher.close(); } catch (e) { }
+      shortcutsWatcher = null;
+    }
+    shortcutsWatcher = chokidar.watch(SHORTCUTS_PATH, { ignoreInitial: true, persistent: true });
+    let reloadTimer = null;
+    shortcutsWatcher.on('change', () => {
+      if (reloadTimer) clearTimeout(reloadTimer);
+      reloadTimer = setTimeout(async () => {
+        console.log('[shortcuts] cambio detectado -> recargando shortcuts.json');
+        await loadShortcutsFileAndRegister();
+      }, 200);
+    });
+  } catch (e) {
+    console.warn('[shortcuts] error en watchShortcutsFile:', e);
+  }
+}
+
 
 // ----------------------------------------------------------
 // default app functions
 // ----------------------------------------------------------
 
+// Unregister all keys on exit
+app.on('will-quit', () => { try { globalShortcut.unregisterAll(); } catch (e) { /* ignore */ } });
+
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 
-app.whenReady().then(createWindow);
+app.whenReady().then(async () => {
+  await createWindow();
+  await loadShortcutsFileAndRegister(); // registrar shortcuts y watcher
+  watchShortcutsFile();
+});
 
 // Next file is preload.js

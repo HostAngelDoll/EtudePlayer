@@ -1,0 +1,9 @@
+npx electron-rebuild --verbose
+
+"scripts": {
+  "rebuild": "electron-rebuild --verbose"
+}
+
+npm run rebuild
+
+electron-rebuild -m ./path/to/module

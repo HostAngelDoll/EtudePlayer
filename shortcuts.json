@@ -1,0 +1,12 @@
+{
+  "ctrl+num1": "seekBack10",
+  "ctrl+num2": "nextSong",
+  "ctrl+num3": "seekForward10",
+  "ctrl+num4": "previousSong",
+  "ctrl+num5": "playPause",
+  "ctrl+num6": "toggleWindow",
+  "ctrl+num7": "volumeDown",
+  "ctrl+num8": "playRandom",
+  "ctrl+num9": "volumeUp",
+  "ctrl+num0": "stopSong"
+}
