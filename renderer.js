@@ -1,7 +1,7 @@
 // ##########################################
 // Advertencia: 
 // No tener todas las partes del renderer.js significa no poder hacerle juicio hasta que este entrgeado
-// renderer.js // part-1 to 4
+// renderer.js // part-1 to 3
 // ##########################################
 
 const playlistDiv = document.getElementById('playlist');
@@ -72,6 +72,126 @@ let historyStack = []; // LIFO
 if (savedEqValues.length !== eqBands.length) { savedEqValues = eqBands.map(() => 0); }
 volumeLabel.textContent = `${volumeSlider.value}%`;
 document.title = originalTitle;
+
+// ----------------------------------------------------------------------
+// START peaksDB (IndexedDB helper) 
+// ----------------------------------------------------------------------
+
+const PEAKS_DB_NAME = 'EtudePeaksDB';
+const PEAKS_STORE = 'peaksCache';
+const PEAKS_DB_VERSION = 1;
+
+const peaksDB = {
+  db: null,
+  async open() {
+    if (this.db) return this.db;
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(PEAKS_DB_NAME, PEAKS_DB_VERSION);
+      req.onupgradeneeded = (ev) => {
+        const db = ev.target.result;
+        if (!db.objectStoreNames.contains(PEAKS_STORE)) {
+          const store = db.createObjectStore(PEAKS_STORE, { keyPath: 'path' });
+          store.createIndex('lastAccessed', 'lastAccessed', { unique: false });
+        }
+      };
+      req.onsuccess = () => {
+        this.db = req.result;
+        resolve(this.db);
+      };
+      req.onerror = (e) => {
+        console.error('peaksDB open error', e);
+        reject(e);
+      };
+    });
+  },
+  async get(path) {
+    try {
+      const db = await this.open();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction([PEAKS_STORE], 'readonly');
+        const st = tx.objectStore(PEAKS_STORE);
+        const r = st.get(path);
+        r.onsuccess = () => {
+          const entry = r.result;
+          if (entry) {
+            // convert stored ArrayBuffer to ArrayBuffer (it is already)
+            entry.lastAccessed = Date.now();
+            // update lastAccessed (async, don't await)
+            try {
+              const txu = db.transaction([PEAKS_STORE], 'readwrite');
+              txu.objectStore(PEAKS_STORE).put(entry);
+            } catch (e) {}
+          }
+          resolve(entry || null);
+        };
+        r.onerror = () => resolve(null);
+      });
+    } catch (e) {
+      console.warn('peaksDB.get error', e);
+      return null;
+    }
+  },
+  async put(entry) {
+    // entry { path, size, mtimeMs, duration, peaksCount, peaks: ArrayBuffer, placeholder?:bool }
+    try {
+      const db = await this.open();
+      return new Promise((resolve, reject) => {
+        entry.lastAccessed = Date.now();
+        const tx = db.transaction([PEAKS_STORE], 'readwrite');
+        const st = tx.objectStore(PEAKS_STORE);
+        const r = st.put(entry);
+        r.onsuccess = () => {
+          // optionally prune if too big (implement simple prune triggered here)
+          this.pruneIfNeeded().catch(()=>{});
+          resolve(true);
+        };
+        r.onerror = (e) => { console.warn('peaksDB.put error', e); resolve(false); };
+      });
+    } catch (e) {
+      console.warn('peaksDB.put exception', e);
+      return false;
+    }
+  },
+  async delete(path) {
+    try {
+      const db = await this.open();
+      return new Promise((resolve) => {
+        const tx = db.transaction([PEAKS_STORE], 'readwrite');
+        const st = tx.objectStore(PEAKS_STORE);
+        const r = st.delete(path);
+        r.onsuccess = () => resolve(true);
+        r.onerror = () => resolve(false);
+      });
+    } catch (e) {
+      return false;
+    }
+  },
+  async listAll() {
+    try {
+      const db = await this.open();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction([PEAKS_STORE], 'readonly');
+        const st = tx.objectStore(PEAKS_STORE);
+        const r = st.getAll();
+        r.onsuccess = () => resolve(r.result || []);
+        r.onerror = () => resolve([]);
+      });
+    } catch (e) {
+      return [];
+    }
+  },
+  async pruneIfNeeded() {
+    // Simple pruning policy: limit number of entries to maxEntries
+    const maxEntries = 1000; // tune as you want
+    const all = await this.listAll();
+    if (all.length <= maxEntries) return;
+    // sort by lastAccessed ascending and delete oldest
+    all.sort((a,b) => (a.lastAccessed||0) - (b.lastAccessed||0));
+    const toDelete = all.slice(0, all.length - maxEntries);
+    for (const e of toDelete) await this.delete(e.path);
+  }
+};
+
 
 // ----------------------------------------------------------------------
 // playback and playlist state
@@ -336,8 +456,9 @@ function updatePlaylistUI() {
 
     // Doble click → reproducir y marcar negrita
     tr.addEventListener('dblclick', () => {
+      document.title = originalTitle;
+      statusBar.textContent = "Loading...";
       playSong(index);
-      // tbody.querySelectorAll('tr').forEach(r => r.classList.remove('playing'));      
       tr.classList.add('playing');
     });
 
@@ -381,38 +502,9 @@ function updatePlaylistUI() {
   }
 }
 
-// ##########################################
-// Advertencia: 
-// No tener todas las partes del renderer.js significa no poder hacerle juicio hasta que este entrgeado
-
-// renderer.js // part-2 to 4
-// ##########################################
-
-
 // -----------------------------------------------------
 // Controles
 // -----------------------------------------------------
-
-
-async function playSong(index) { // Reproducir canción por índice
-  if (playlist.length === 0) return;
-
-  function retrasar(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
-  songPath = playlist[index].path || playlist[index]; // ruta absoluta
-  currentSongIndex = index;
-
-  initWaveform(songPath);
-  wavesurfer.setVolume(volumeSlider.value / 100);
-  retrasar(1000);
-  wavesurfer.play();
-  updatePlaylistUI();
-
-  console.log(`Is playing: ${songPath}`);
-  document.title = getNameAndYear(songPath);
-}
 
 function stopSong() {
   if (wavesurfer) {
@@ -435,16 +527,17 @@ function playSongBtn() {
   }
 }
 
-function prevSongBtn() {
+async function prevSongBtn() {
   if (playlist.length === 0) return;
   currentSongIndex = (currentSongIndex - 1 + playlist.length) % playlist.length;
-  playSong(currentSongIndex);
+  await playSong(currentSongIndex);
+  
 }
 
-function nextSongBtn() {
+async function nextSongBtn() {
   if (playlist.length === 0) return;
   currentSongIndex = (currentSongIndex + 1) % playlist.length;
-  playSong(currentSongIndex);
+  await playSong(currentSongIndex);
 }
 
 // ----------------------------------------------------------------------
@@ -651,7 +744,6 @@ function updateVolumeUI(volume) {
   btnMute.textContent = isMuted ? 'Unmute' : 'Mute';
 }
 
-// Aplica el volumen a Wavesurfer si existe
 function applyVolume() {
   if (wavesurfer) { wavesurfer.setVolume(isMuted ? 0 : currentVolume); }
 }
@@ -697,12 +789,6 @@ volumeSlider.addEventListener('input', () => {
 });
 
 
-// ##########################################
-// Advertencia: 
-// No tener todas las partes del renderer.js significa no poder hacerle juicio hasta que este entrgeado
-// renderer.js // part-3 to 4
-// ##########################################
-
 // ----------------------------------------------------------------
 // Waveform slider
 // ----------------------------------------------------------------
@@ -741,7 +827,7 @@ function crearVideoPlayer(url) {
   // Crear el nuevo elemento video
   const video = document.createElement('video');
   video.id = 'videoPlayer';
-  video.controls = true;
+  video.controls = false;
   video.playsInline = true;
   video.style.width = '100%';
   video.style.maxWidth = '600px';
@@ -761,157 +847,19 @@ function apagarVideoPlayer() {
   container.style.display = 'none';
 }
 
-function initWaveform(audioPath) {
-  // destruir instancia previa
-  if (wavesurfer) {
-    wavesurfer.destroy();
-  }
 
-  const _wave_color = '#909090ff'
-  const _progress_Color = '#5d5d5dff'
+let _1 = 0;
+// ##########################################
+// Advertencia: 
+// No tener todas las partes del renderer.js significa no poder hacerle juicio hasta que este entrgeado
 
-  if (audioPath.toLowerCase().endsWith('.mp4')) {
-    // mostrar el contenedor de video
-    crearVideoPlayer(audioPath);
-
-    wavesurfer = WaveSurfer.create({
-      container: '#waveform',
-      waveColor: _wave_color,
-      progressColor: _progress_Color,
-      height: 30,
-      responsive: true,
-      media: videoPlayer,   // aquí va el <video>
-    });
-
-  } else {
-    // ocultar video si no es mp4
-    apagarVideoPlayer()
-
-    wavesurfer = WaveSurfer.create({
-      container: '#waveform',
-      waveColor: _wave_color,
-      progressColor: _progress_Color,
-      height: 30,
-      responsive: true,
-    });
-
-    wavesurfer.load(audioPath);
-  }
-
-  updateVolumeUI(volumeSlider.value / 100);
-  currentVolume = volumeSlider.value / 100;
+// renderer.js // part-2 to 3
+// ##########################################
 
 
-  wavesurfer.on('audioprocess', () => {
-    const current = wavesurfer.getCurrentTime();
-    const total = wavesurfer.getDuration();
-    const left = total - current;
-
-    currentDurLabel.textContent = formatTime(current);
-    leftDurLabel.textContent = formatTime(left, true);
-  });
-
-  wavesurfer.on('ready', () => {
-    const total = wavesurfer.getDuration();
-    totalDurLabel.textContent = formatTime(total);
-    currentDurLabel.textContent = "0:00";
-    leftDurLabel.textContent = formatTime(total, true);
-    wavesurfer.setPlaybackRate(pitchValue, false);
-
-    // Crear AudioContext si no existe y una sola vez
-    if (!audioContext) {
-      audioContext = new AudioContext();
-
-      // Crear filtros para cada banda
-      eqFilters = eqBands.map((band, i) => {
-        const filter = audioContext.createBiquadFilter();
-        filter.type = band <= 32 ? 'lowshelf' : band >= 16000 ? 'highshelf' : 'peaking';
-        filter.Q.value = 1;
-        filter.frequency.value = band;
-        filter.gain.value = parseFloat(sliders[i].value); // aplicar valor actual del slider
-        return filter;
-      });
-    }
-
-    // ⚡ Crear un nuevo mediaNode SIEMPRE
-    if (mediaNode) {
-      try { mediaNode.disconnect(); } catch (e) { }
-    }
-
-    // Conectar media element a los filtros
-    const audio = wavesurfer.getMediaElement();
-
-    try {
-      mediaNode = audioContext.createMediaElementSource(audio);
-    } catch (error) { }
-
-    // Conectar filtros en cadena
-    const equalizer = eqFilters.reduce((prev, curr) => {
-      prev.connect(curr);
-      return curr;
-    }, mediaNode);
-
-    // Conectar al destino
-    equalizer.connect(audioContext.destination);
-
-  });
-
-  // cuando acaba
-  wavesurfer.on('finish', () => {
-    if (stopAfterCheckbox.checked) {
-      stopAfterCheckbox.checked = false; // desmarcar automáticamente
-      document.title = originalTitle;    // reset título
-      songPath = null
-      clearPlayingStyle();
-      return; // no reproducir siguiente
-    }
-
-    if (playlist.length > 0) {
-      currentSongIndex = (currentSongIndex + 1) % playlist.length;
-      playSong(currentSongIndex);
-    } else {
-      document.title = originalTitle;
-      songPath = null
-      statusBar.textContent = originalTitle;
-      clearPlayingStyle();
-    }
-  });
-
-  wavesurfer.on('play', () => {
-    wavesurfer.setVolume(isMuted ? 0 : currentVolume);
-    const currentSong = playlist[currentSongIndex];
-    if (currentSong) {
-      statusBar.textContent = `Playing: ${currentSong.name}`;
-    }
-  });
-
-  wavesurfer.on('pause', () => {
-    if (!wavesurfer.isPlaying()) {
-      statusBar.textContent = "Paused";
-    }
-  });
-
-  wavesurfer.on('error', (errMsg) => {
-    console.error('WaveSurfer error:', errMsg);
-
-    // Opcional: mostrar mensaje al usuario
-    statusBar.textContent = `Error al reproducir: ${errMsg}`;
-
-    // Saltar a la siguiente canción si hay playlist
-    if (playlist.length > 0) {
-      currentSongIndex = (currentSongIndex + 1) % playlist.length;
-      playSong(currentSongIndex);
-    } else {
-      // Si no hay más canciones, restablecer estado
-      document.title = originalTitle;
-      songPath = null;
-      statusBar.textContent = originalTitle;
-      clearPlayingStyle();
-    }
-  });
-}
 
 // Vincular sliders a filtros y almacenamiento
+
 sliders.forEach((slider, i) => {
   slider.addEventListener('input', () => {
     const val = parseFloat(slider.value);
@@ -991,6 +939,15 @@ window.electronAPI.onFileRenamed(async ({ oldPath, newPath }) => {
   });
 
   loadPlaylistFromArray(playlist, pathFolder, true, "onFileRenamed"); // vuelve a renderizar
+  try {
+    const entry = await peaksDB.get(oldPath);
+    if (entry) {
+      // attempt to move/rename key: copy entry under newPath, delete old key
+      const newEntry = { ...entry, path: newPath, lastAccessed: Date.now() };
+      await peaksDB.put(newEntry);
+      await peaksDB.delete(oldPath);
+    }
+  } catch (e) { /* ignore */ }
 });
 
 // carpetas de cada año
@@ -1051,6 +1008,8 @@ window.electronAPI.onContextPlaySelected(() => {
 
   const index = parseInt(selectedRow.dataset.index, 10);
   if (!isNaN(index)) {
+    document.title = originalTitle;
+    statusBar.textContent = "Loading...";
     playSong(index);
   }
 });
@@ -1155,8 +1114,10 @@ window.electronAPI.onContextMenuAction(async (action) => {
 // ##########################################
 // Advertencia: 
 // No tener todas las partes del renderer.js significa no poder hacerle juicio hasta que este entrgeado
-// renderer.js // part-4 to 4
+
+// renderer.js // part-3 to 4
 // ##########################################
+
 
 // ---------------------------------------------------------------
 // move files opetations | Modal / Tree code
@@ -1633,12 +1594,13 @@ window.electronAPI.onMoveTreeAction(async (action) => {
 
 // ----------------- Fin del modal -----------------------------
 
+// ##########################################
+// Advertencia: 
+// No tener todas las partes del renderer.js significa no poder hacerle juicio hasta que este entrgeado
 
-// Normalizar rutas para comparar (tolower + backslashes)
-function normalizePathForCompare(p) {
-  if (!p || typeof p !== 'string') return '';
-  return p.replace(/\//g, '\\').toLowerCase();
-}
+// renderer.js // part-4 to 4
+// ##########################################
+
 
 /**
  * Validate & prepare move:
@@ -2479,6 +2441,325 @@ window.electronAPI.onShortcutAction(async ({ action } = {}) => {
   }
 });
 
+// ----------------------------------------------------------------------------
+// Wavepeaks processor
+// ----------------------------------------------------------------------------
+
+
+// Helper: single creation of audioContext + eqFilters (lazy)
+function ensureEQFilters() {
+  try {
+    if (!audioContext) {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (!eqFilters || !eqFilters.length) {
+      eqFilters = eqBands.map((band, i) => {
+        const filter = audioContext.createBiquadFilter();
+        filter.type = band <= 32 ? 'lowshelf' : band >= 16000 ? 'highshelf' : 'peaking';
+        filter.Q.value = 1;
+        filter.frequency.value = band;
+        filter.gain.value = parseFloat(sliders[i].value || 0);
+        return filter;
+      });
+    }
+    return { audioContext, eqFilters };
+  } catch (e) {
+    console.warn('ensureEQFilters error', e);
+    return null;
+  }
+}
+
+// Placeholder generator (small flat line, not total silence)
+function makePlaceholderPeaks(count = 8192) {
+  const arr = new Float32Array(count);
+  for (let i = 0; i < count; i++) {
+    arr[i] = 0.0001; // tiny non-zero so wave is visible thin
+  }
+  return arr;
+}
+
+async function playSong(index) {
+  if (playlist.length === 0) return;
+
+  if (wavesurfer && wavesurfer.isPlaying()) {
+    wavesurfer.stop();
+    clearPlayingStyle()
+    document.title = originalTitle;
+    statusBar.textContent = "Loading...";
+  }
+
+  songPath = playlist[index].path || playlist[index];
+  currentSongIndex = index;
+
+  try {
+    // Obtener metadata desde main (size, mtimeMs, duration)
+    const meta = await window.electronAPI.getFileMetadata(songPath);
+    const durationSec = parseFloat(meta.duration || 0);
+
+    const isLong = durationSec > 20 * 60; // 20 minutes threshold
+
+    if (isLong) {
+      // comprobar cache
+      const cached = await peaksDB.get(songPath);
+      const validCache = cached && cached.size === meta.size && cached.mtimeMs === meta.mtimeMs && Math.abs((cached.duration||0) - durationSec) < 0.6;
+
+      if (validCache && cached.peaks && cached.peaks instanceof ArrayBuffer) {
+        // usar cache
+        console.log("Cargando cache de onda de picos")
+        const peaksFloat = new Float32Array(cached.peaks);
+        await initWaveform(songPath, peaksFloat);
+        wavesurfer.setVolume(volumeSlider.value / 100);
+        wavesurfer.play();
+      } else {
+        // No cache -> generar peaks via main (FFmpeg)
+        // mostrar UI de progress
+        showProgressNotification('Generando forma de onda (picos) — esto acelera futuras cargas...', 0);
+
+        // subscribe a progress events
+        const onProgress = (p) => {
+          if (!p || !p.path || normalizePathForCompare(p.path) !== normalizePathForCompare(songPath)) return;
+          const percent = (typeof p.percent === 'number') ? p.percent/100 : 0;
+          showProgressNotification('Generando forma de onda...', percent);
+        };
+        window.electronAPI.onPeaksProgress(onProgress);
+
+        // If there is currently a peaks job and the user opens another long file,
+        // main.job manager will apply preemption rules. Here we simply request generation.
+        console.log("Generando onda de picos para wavesufer");
+        const peaksCount = 8192; // tuneable
+        const res = await window.electronAPI.generatePeaks({ path: songPath, peaksCount });
+        console.log("La onda de picos se ha generado");
+
+        // unsubscribe progress (removeAllListeners in preload ensures replacement; keep defensive)
+        // Note: preload's onPeaksProgress uses removeAllListeners before re-registering.
+
+        if (res && res.success && res.peaks) {
+          console.log("Guardando los picos en cache")
+          // convert Buffer -> ArrayBuffer
+          const buf = res.peaks;
+          // Node Buffer's underlying ArrayBuffer may be larger: create a slice
+          const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+          // save in DB
+          await peaksDB.put({
+            path: songPath,
+            size: res.size || meta.size,
+            mtimeMs: meta.mtimeMs,
+            duration: res.duration || meta.duration,
+            peaksCount: res.peaksCount || peaksCount,
+            peaks: ab,
+            placeholder: false,
+            createdAt: Date.now()
+          });
+
+          console.log("Playing with new precreated peaks")
+          const peaksFloat = new Float32Array(ab);
+          await initWaveform(songPath, peaksFloat);
+          wavesurfer.setVolume(volumeSlider.value / 100);
+          wavesurfer.play();
+
+        } else {
+          // failure or cancelled -> fallback placeholder so waveform is visible (flat)
+          console.warn('generatePeaks failed or cancelled', res);
+          const placeholder = makePlaceholderPeaks(8192);
+          await initWaveform(songPath, placeholder);
+          wavesurfer.setVolume(volumeSlider.value / 100);
+          wavesurfer.play();
+          showProgressNotification('No se pudo generar forma de onda — usando placeholder', 1, true, 4000);
+        }
+      }
+    } else {
+      // short file -> normal path (wavesurfer will compute quickly)
+      await initWaveform(songPath, null);
+      wavesurfer.setVolume(volumeSlider.value / 100);
+      wavesurfer.play();
+    }
+
+    updatePlaylistUI();
+    console.log(`Is playing: ${songPath}`);
+    document.title = getNameAndYear(songPath);
+  } catch (error) {
+    console.error("Error al inicializar waveform:", error);
+    statusBar.textContent = "Error al iniciar la canción.";
+    // fallback: attempt immediate playback without precomputed peaks
+    try {
+      await initWaveform(songPath, null);
+      wavesurfer.setVolume(currentVolume);
+      wavesurfer.play();
+    } catch (e) { /* ignore */ }
+  }
+}
+
+function initWaveform(audioPath, precomputedPeaks = null) {
+  return new Promise((resolve, reject) => {
+    // destruir instancia previa
+    if (wavesurfer) { try { wavesurfer.destroy(); } catch (e) { /* ignore */ } }
+
+    const _wave_color = '#909090ff';
+    const _progress_Color = '#5d5d5dff';
+    const _cursor_color = '#ddd5e9';
+
+    const commonOpts = {
+      container: '#waveform',
+      waveColor: _wave_color,
+      progressColor: _progress_Color,
+      cursorColor: _cursor_color,
+      minPxPerSec: 0.1, // allow wavesurfer to economize pixels for long files
+      height: 30,
+      responsive: true,
+      partialRender: true,
+      fillParent: true,
+      hideScrollbar: true,
+      autoScroll: false, 
+      //backend: 'WebAudio' // ensure WebAudio backend for filters
+    };
+
+    // If precomputedPeaks provided, pass as peaks (expects Float32Array or array)
+    if (precomputedPeaks) {
+      commonOpts.peaks = precomputedPeaks;
+    }
+
+    // For mp4/video case: if audioPath endsWith .mp4, create videoPlayer and provide media
+    if (audioPath.toLowerCase().endsWith('.mp4')) {
+      crearVideoPlayer(audioPath);
+      wavesurfer = WaveSurfer.create({
+        ...commonOpts,
+        media: videoPlayer
+      });
+    } else {
+      apagarVideoPlayer();
+      wavesurfer = WaveSurfer.create(commonOpts);
+      // if we have precomputed peaks, create will draw instantly from peaks. Still need to call load.
+      wavesurfer.load(audioPath);
+    }
+
+    // Initialize volume/pitch UI state
+    updateVolumeUI(volumeSlider.value / 100);
+    currentVolume = volumeSlider.value / 100;
+
+    // Ensure eq filters exist once
+    ensureEQFilters();
+
+    // Attach audio processing events
+    wavesurfer.on('audioprocess', () => {
+      const current = wavesurfer.getCurrentTime();
+      const total = wavesurfer.getDuration();
+      const left = total - current;
+
+      currentDurLabel.textContent = formatTime(current);
+      leftDurLabel.textContent = formatTime(left, true);
+    });
+
+    wavesurfer.on('ready', () => {
+      try {
+        const total = wavesurfer.getDuration();
+        totalDurLabel.textContent = formatTime(total);
+        currentDurLabel.textContent = "0:00";
+        leftDurLabel.textContent = formatTime(total, true);
+        wavesurfer.setPlaybackRate(pitchValue, false);
+
+        // Connect media element source to our persistent AudioContext + eqFilters
+        try {
+          // Ensure we have audioContext & eqFilters
+          ensureEQFilters();
+
+          // Acquire the audio element from wavesurfer
+          const mediaEl = wavesurfer.getMediaElement();
+          if (mediaEl && audioContext) {
+            // createMediaElementSource for this element and wire to filters
+            try {
+              if (mediaNode) {
+                try { mediaNode.disconnect(); } catch (e) {}
+              }
+              mediaNode = audioContext.createMediaElementSource(mediaEl);
+            } catch (e) {
+              // If createMediaElementSource fails (e.g. element already used in another context), ignore and fallback
+              console.warn('createMediaElementSource failed:', e);
+              mediaNode = null;
+            }
+
+            if (mediaNode) {
+              // chain node -> filter0 -> ... -> filterN -> destination
+              let prev = mediaNode;
+              for (let i = 0; i < eqFilters.length; i++) {
+                try {
+                  prev.connect(eqFilters[i]);
+                  prev = eqFilters[i];
+                } catch (err) {
+                  console.warn('Error connecting filter', err);
+                }
+              }
+              try {
+                prev.connect(audioContext.destination);
+              } catch (err) {
+                console.warn('Error connecting to destination', err);
+              }
+            } else {
+              // fallback: if we cannot create mediaNode, try to use wavesurfer.backend.setFilters() if available
+              try {
+                if (wavesurfer.backend && typeof wavesurfer.backend.setFilters === 'function' && eqFilters && eqFilters.length) {
+                  wavesurfer.backend.setFilters(eqFilters);
+                }
+              } catch (err) {
+                // ignore
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('Error connecting EQ filters:', err);
+        }
+
+        // Set volume
+        wavesurfer.setVolume(isMuted ? 0 : volumeSlider.value / 100);
+
+        resolve(wavesurfer);
+      } catch (err) {
+        reject(err);
+      }
+    });
+
+    wavesurfer.on('finish', () => {
+      if (stopAfterCheckbox.checked) {
+        stopAfterCheckbox.checked = false;
+        document.title = originalTitle;
+        songPath = null;
+        clearPlayingStyle();
+        return;
+      }
+
+      if (playlist.length > 0) {
+        currentSongIndex = (currentSongIndex + 1) % playlist.length;
+        playSong(currentSongIndex);
+      } else {
+        document.title = originalTitle;
+        songPath = null;
+        statusBar.textContent = originalTitle;
+        clearPlayingStyle();
+      }
+    });
+
+    wavesurfer.on('play', () => {
+      wavesurfer.setVolume(isMuted ? 0 : volumeSlider.value / 100);
+      const currentSong = playlist[currentSongIndex];
+      if (currentSong) {
+        // statusBar.textContent = `Playing: ${currentSong.name}`;
+        statusBar.textContent = "Playing";
+      }
+    });
+
+    wavesurfer.on('pause', () => {
+      if (!wavesurfer.isPlaying() && statusBar.textContent === "Playing") {
+        statusBar.textContent = "Paused";
+      }
+    });
+
+    wavesurfer.on('error', (errMsg) => {
+      console.error('WaveSurfer error:', errMsg);
+      statusBar.textContent = `Error al reproducir: ${errMsg}`;
+      reject(errMsg);
+    });
+  });
+}
+
 
 // -------------------------------------------------------------
 // Listeners del playback, controles y DOM
@@ -2499,8 +2780,3 @@ btnVolDown.addEventListener('click', () => { volumeDown() });     //numkey7
 
 updateVolumeUI(defaultVol); //inicializar volumen
 window.refreshTree = refreshTree; // expose globally (optional) so other modules can call refreshTree()
-
-
-// ##########################################
-// next file -> index.html
-// ##########################################

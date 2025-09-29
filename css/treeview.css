@@ -32,11 +32,11 @@ li.open>ul {
 }
 
 #tree li.open > ul{
-  color: rgb(0, 0, 0);
+  color: rgb(255, 255, 255);
   border-radius: 4px;
 }
 
 #tree li.active.open > ul {
   display: block;
-  color: black;
+  color: rgb(255, 255, 255);
 }

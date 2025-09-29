@@ -223,6 +223,55 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('shortcut-action', (event, payload) => callback(payload));
   },
 
+  
+  // --- START: peaks/ffmpeg related APIs ---
+  getFileMetadata: async (filePath) => {
+    try {
+      return await ipcRenderer.invoke('get-file-metadata', filePath);
+    } catch (err) {
+      console.error('getFileMetadata error:', err);
+      return { size: 0, mtimeMs: 0, duration: 0, error: String(err) };
+    }
+  },
+  generatePeaks: async ({ path, peaksCount = 8192, priority = 'normal' } = {}) => {
+    try {
+      return await ipcRenderer.invoke('generate-peaks', { path, peaksCount, priority });
+    } catch (err) {
+      console.error('generatePeaks error:', err);
+      return { success: false, error: String(err) };
+    }
+  },
+  cancelPeaks: async ({ path } = {}) => {
+    try {
+      return await ipcRenderer.invoke('cancel-peaks', { path });
+    } catch (err) {
+      console.error('cancelPeaks error:', err);
+      return { success: false, error: String(err) };
+    }
+  },
+
+  onPeaksProgress: (callback) => {
+    ipcRenderer.removeAllListeners('peaks-progress');
+    ipcRenderer.on('peaks-progress', (event, payload) => callback(payload));
+  },
+  onPeaksStarted: (callback) => {
+    ipcRenderer.removeAllListeners('peaks-started');
+    ipcRenderer.on('peaks-started', (event, payload) => callback(payload));
+  },
+  onPeaksDone: (callback) => {
+    ipcRenderer.removeAllListeners('peaks-done');
+    ipcRenderer.on('peaks-done', (event, payload) => callback(payload));
+  },
+  onPeaksCancelled: (callback) => {
+    ipcRenderer.removeAllListeners('peaks-cancelled');
+    ipcRenderer.on('peaks-cancelled', (event, payload) => callback(payload));
+  },
+  onPeaksError: (callback) => {
+    ipcRenderer.removeAllListeners('peaks-error');
+    ipcRenderer.on('peaks-error', (event, payload) => callback(payload));
+  }
+  // --- END: peaks APIs ---
+
 });
 
 // ##########################################

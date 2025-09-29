@@ -22,6 +22,7 @@ List:
 - ✅ Move to recicler bin
 - ✅ Historial para desahcer operaciones de archivo
 - ✅ Global Keyboard shortcuts
+- corregir bugs de wavesfufer y cacheado de picos (operacion grande).
 - Estirilizado final de etudeplayer
 
 
@@ -189,6 +190,32 @@ List:
       - ctrl + num0 Stop Song
     - ✅ verificar (*) funciones no implementada en renderer.js o en main.js
     - ✅ mensaje de aviso si interfiere un programa como el jubilado foobar2000
+
+
+  - ✅ Resolver correcion de rendimiento al reproducir canciones largas
+    - Encotrado:
+      - en wavesufer.js cuando abro un archivo largo se reproduce sin problemas pero no hay onda y tarda en cargar la onda y empieza a lagearse la pagina y cuando ya se cargo después de varias trabadas ya queda la onda pero los efectos del ecualizador se pierden, vuelvo a abrir el archivo y de nuevo. edit: ya se porque despues de unos milisegundos se aplican los efectos del ecualizador y se debe a que aun no se ha cargado la onda y una vez cargada se aplican, eso solo lo he visto en archivos que duran poco tiempo como 3 o 5 minutos.
+      - ya se porque despues de unos milisegundos se aplican los efectos del ecualizador y se debe a que aun no se ha cargado la onda y una vez cargada se aplican, eso solo lo he visto en archivos que duran poco tiempo como 3 o 5 minutos. eso se le conoce como glope limpio al aplicar los efectos del ecualizador unos milisegundo despues.
+      - edit: tras pasar por dificultades me doy cuenta que si si aun no esta cargada la onda de picos, los efectos no se aplican. pero esto ya se ve solucionado porque esta en promise la funcion del init del wavesfuer y eso soluciono el problema, nada más que cuando esta trabajando con generar la onda en archivos pesados, la interfaz del html se congela y eso afecta el rendimiento. en resumen no tengo ya el problema de los efectos por ahora.
+      - algo que aprendi es que los picos no se hace con wavesufer.load() si no es a traves de WaveSurfer.create({ peaks: _myPeaks }).
+      - wavesufer usa la version 
+    - Mecanismo pensado para corregir el problema (archivos duran más de 20 min):
+      - por medio de la funcion playSong(index) despues de obtener la ruta se comprobara si la cancion dura más tiempo y en ese caso se hara lo siguiente.
+        - la ruta de la cancion se envia al main.js usando `FFmpeg-Peaks` para obtener la onda de picos y la regresara al renderer para almacenarla al IndexedDB y darle los picos a wavesufer.
+          - el progreso de la tarea se podra ver desde la consola.
+        - en caso de ser la segunda vez de abrir la cancion se obtendran los picos de IndexedDB para acelerar la apertura de la cancion y darle los picos al init de wavesufer.
+        - dar los picos a wavesufer con las canciones que duran 20 min y debe de ser antes de iniciar la reproduccion porque wavesfuer no soporta la carga de picos progresiva.
+        - si el usuario quiere abrir otra cancion pero corta y se esta trajando en los picos, dejamos que termine y guarde los picos en IndexedDB. en caso de querer abrir otra cancion pero que dura más de 20 minutos, podemos detener el proceso de los picos y trabajamos en esa cancion entonces.
+        - en caso de que algo falle, wavesufer no puede generar picos en canciones de más de 20 min, lo que se hara es enviar dependiendo de la duracion una onda de picos de una linea pequeña que parece silencio de pista y se hace esto para al menos poder ver el cursor de la posicion de la cancion y mostrar un placeholder en el waveform diciendo que no se obtuvo la onda de picos.
+    - control de la cache de los picos en IndexedDB:
+      - la cache guarda estos metadatos: {ruta, tamaño, duracion} y los picos
+      - si cambia uno de estos metadatos {ruta, tamaño, duracion} se invalida y se vuelven a generar.
+      - habra una verificacion si las rutas de las canciones todavia existen, si no se borraran los archivos que se han elimiado o desaparecido.
+      - si se mueve un archivo a otra carpeta, se ve a la papelera o se renombra el archivo o se renombra la carpeta elegida para la playlist. se buscaran las rutas de antes y se actualizaran en el almacenado el metadado de ruta.
+      - al inicio de la app se comprobara si los archivos si existen todavia, de lo contraio se eliminaran del registro de cache en IndexedDB.
+      - al cerrar la app o por cada movimiento o consulta de picos se guarda todo lo relacionado con la en IndexedDB.
+    - observacion: se ha resuelto al parecer pero al momento de darle los picos a wavesufer empieza a realentizarse la ui y un poco el pc mientras adquiere los picos precalculados aunque eso es un rato. ya despues todo fluye bien. cacheado o no. aunque mientras se genera como que la ui se conngela un momento. se tendria que ver esto pero lo más pesado se ha resuelto. mientras tanto se revisara el rendimiento de electron, para luego esterilizar la interfaz.
+
 
 ------------------------------------------------------------------------------------------------
 

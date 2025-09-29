@@ -3,4 +3,12 @@
   width: 500px;
   height: 30px;
   background-color: black;
+  border-width: 1px;
+  border-style: solid;
+  border-color: rgb(86, 86, 86);
+}
+
+body{
+  background-color: black;
+  color: white;
 }

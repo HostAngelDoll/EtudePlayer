@@ -1,8 +1,9 @@
 // main.js
 const { app, BrowserWindow, ipcMain, Menu, dialog, shell, globalShortcut } = require('electron');
+// require('electron-debug').default();
 const path = require('path');
 const fs = require('fs').promises;
-const chokidar = require("chokidar");
+const chokidar = require("chokidar"); 
 const CACHE_PATH = path.join(app.getPath("userData"), "cache.json");
 const XMAS_START_YEAR = 2004;
 const XMAS_END_YEAR = 2021;
@@ -15,19 +16,18 @@ let watchers = new Map();
 let watchdogEnabled = true; // --- WATCHDOG GLOBAL (activar/desactivar notificaciones de watchers) ---
 let win;
 
-
 async function createWindow() { // main function to start app
   win = new BrowserWindow({
     width: 1200,
     height: 720,
     title: 'EtudePlayer',
+    icon: path.join(__dirname, 'assets/icon_tb.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'), // usar preload seguro
       contextIsolation: true,                      // habilitar aislamiento
       nodeIntegration: false                       // desactivar para seguridad
     }
   });
-
   win.loadFile('index.html');
 
 }
@@ -867,6 +867,303 @@ function watchShortcutsFile() {
   }
 }
 
+// --------------------------------------------------------------
+// ffmpeg peaks and wavefrom processor
+// -------------------------------------------------------------- 
+
+
+// --- START: Peaks generation worker + IPC handlers (INSERT near top of main.js) ---
+const child_process = require('child_process');
+let ffmpegPath = 'ffmpeg';
+try { ffmpegPath = require('ffmpeg-static'); } catch (e) { /* fallback to system ffmpeg */ }
+let ffprobePath = 'ffprobe';
+try { const _ffp = require('ffprobe-static'); ffprobePath = _ffp.path || _ffp; } catch (e) { /* fallback to system ffprobe */ }
+
+const SAMPLE_RATE = 44100; // PCM sample rate we'll request from ffmpeg
+
+// Simple job manager for peak generation (concurrency 1, preemption support)
+const peaksJobManager = {
+  queue: [],
+  currentJob: null,
+  jobsByPath: new Map(), // path -> job
+  concurrency: 1,
+
+  async enqueue(jobParams) {
+    // If there's already an in-flight job for the same path, return its promise
+    if (this.jobsByPath.has(jobParams.path)) {
+      return this.jobsByPath.get(jobParams.path).promise;
+    }
+
+    const job = createJob(jobParams);
+    this.jobsByPath.set(job.path, job);
+    this.queue.push(job);
+
+    // try start if idle
+    this._maybeStartNext();
+    return job.promise;
+  },
+
+  _start(job) {
+    this.currentJob = job;
+    job.status = 'running';
+    job.startedAt = Date.now();
+    // run generation
+    runFFmpegPeaks(job).then(result => {
+      job.status = 'done';
+      job.finishedAt = Date.now();
+      job.resolve(result);
+    }).catch(err => {
+      job.status = (err && err.cancelled) ? 'cancelled' : 'error';
+      job.finishedAt = Date.now();
+      job.reject(err);
+    }).finally(() => {
+      // cleanup
+      this.jobsByPath.delete(job.path);
+      this.currentJob = null;
+      // start next queued job (if any)
+      setImmediate(() => this._maybeStartNext());
+    });
+  },
+
+  _maybeStartNext() {
+    if (this.currentJob) return;
+    if (this.queue.length === 0) return;
+    const nextJob = this.queue.shift();
+    this._start(nextJob);
+  },
+
+  cancelByPath(path, reason = 'cancelled-by-request') {
+    // If running job is this path -> kill it
+    const running = this.currentJob;
+    if (running && running.path === path) {
+      if (running.proc && !running.proc.killed) {
+        try { running.proc.kill('SIGKILL'); } catch (e) {}
+      }
+      running.reject({ cancelled: true, reason });
+      return true;
+    }
+    // if in queue, remove it and reject
+    const idx = this.queue.findIndex(j => j.path === path);
+    if (idx >= 0) {
+      const [job] = this.queue.splice(idx, 1);
+      job.reject({ cancelled: true, reason });
+      this.jobsByPath.delete(path);
+      return true;
+    }
+    return false;
+  }
+};
+
+function createJob({ path, peaksCount = 8192, priority = 'normal' }) {
+  let resolve, reject;
+  const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+    path,
+    peaksCount: peaksCount | 0,
+    priority,
+    status: 'pending',
+    startedAt: null,
+    finishedAt: null,
+    proc: null,
+    resolve, reject,
+    promise
+  };
+}
+
+// Helper: get file duration via ffprobe (returns seconds, 0 on failure)
+function ffprobeGetDuration(filePath) {
+  return new Promise((resolve) => {
+    try {
+      const args = ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', filePath];
+      const p = child_process.spawn(ffprobePath, args);
+      let out = '';
+      p.stdout.on('data', d => out += d.toString());
+      p.on('close', () => {
+        const dur = parseFloat((out || '').trim()) || 0;
+        resolve(dur);
+      });
+      p.on('error', () => resolve(0));
+    } catch (e) {
+      resolve(0);
+    }
+  });
+}
+
+/**
+ * Core: run ffmpeg to produce f32le PCM mono at SAMPLE_RATE and compute peaks streaming
+ * job: { path, peaksCount, id, ... }
+ * returns -> { peaks: Buffer (float32), peaksCount, size, duration }
+ */
+async function runFFmpegPeaks(job) {
+  const { path, peaksCount } = job;
+  // get file stat & duration first
+  let stat;
+  try {
+    stat = await fs.stat(path);
+  } catch (err) {
+    throw { error: 'stat-failed', message: err && err.message ? err.message : String(err) };
+  }
+
+  const duration = await ffprobeGetDuration(path);
+  // total samples estimation
+  const totalSamples = Math.max(1, Math.floor(duration * SAMPLE_RATE));
+  const targetPeaks = Math.max(128, peaksCount || 8192);
+  const samplesPerPeak = Math.max(1, Math.floor(totalSamples / targetPeaks));
+
+  // Allocate peaks array
+  const peaks = new Float32Array(targetPeaks);
+  let peakIndex = 0;
+  let sampleInWindow = 0;
+  let currentMax = 0;
+
+  let processedSamples = 0;
+
+  return new Promise((resolve, reject) => {
+    // spawn ffmpeg to output float32le mono PCM
+    const args = [
+      '-i', path,
+      '-vn',
+      '-ac', '1',
+      '-ar', String(SAMPLE_RATE),
+      '-f', 'f32le',
+      '-' // stdout
+    ];
+    const proc = child_process.spawn(ffmpegPath, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    job.proc = proc;
+
+    // parse stderr for progress time (optional)
+    proc.stderr.on('data', (chunk) => {
+      const s = chunk.toString();
+      // try parse "time=hh:mm:ss.xx"
+      const m = s.match(/time=(\d+:\d+:\d+\.\d+)/);
+      if (m) {
+        const parts = m[1].split(':').map(parseFloat);
+        const hh = parseFloat(parts[0]), mm = parseFloat(parts[1]), ss = parseFloat(parts[2]);
+        const seconds = hh * 3600 + mm * 60 + ss;
+        const percent = duration > 0 ? Math.min(100, (seconds / duration) * 100) : 0;
+        try { win && win.webContents && win.webContents.send('peaks-progress', { jobId: job.id, path, percent, time: seconds }); } catch (e) {}
+      }
+    });
+
+    // buffer handling for float32 samples
+    let leftover = null;
+    proc.stdout.on('data', (chunk) => {
+      if (!chunk || chunk.length === 0) return;
+      // merge leftover if exists
+      let buffer = chunk;
+      if (leftover && leftover.length) {
+        buffer = Buffer.concat([leftover, chunk]);
+        leftover = null;
+      }
+      // how many complete float32 samples we have
+      const sampleCount = Math.floor(buffer.length / 4);
+      const bytesUsed = sampleCount * 4;
+      if (bytesUsed < buffer.length) {
+        leftover = buffer.slice(bytesUsed);
+      }
+
+      if (sampleCount === 0) return;
+
+      // create Float32Array view (little-endian floats)
+      // Must use Buffer's underlying ArrayBuffer with byteOffset
+      const floats = new Float32Array(buffer.buffer, buffer.byteOffset, sampleCount);
+
+      for (let i = 0; i < floats.length; i++) {
+        const v = Math.abs(floats[i]);
+        currentMax = Math.max(currentMax, v);
+        sampleInWindow++;
+        processedSamples++;
+
+        if (sampleInWindow >= samplesPerPeak) {
+          // store peak
+          if (peakIndex < targetPeaks) {
+            peaks[peakIndex] = currentMax;
+            peakIndex++;
+          }
+          // reset window
+          sampleInWindow = 0;
+          currentMax = 0;
+
+          // occasionally emit progress based on peaks computed
+          if (peakIndex % Math.max(1, Math.floor(targetPeaks / 40)) === 0) {
+            const percent = Math.min(100, (peakIndex / targetPeaks) * 100);
+            try { win && win.webContents && win.webContents.send('peaks-progress', { jobId: job.id, path, percent, peaksComputed: peakIndex }); } catch (e) {}
+          }
+        }
+      }
+    });
+
+    proc.on('close', (code, signal) => {
+      // If job was cancelled, reject accordingly
+      if (job.status === 'cancelled' || (signal && signal !== null && signal !== undefined && signal !== 0)) {
+        return reject({ cancelled: true, code, signal });
+      }
+      // If we didn't fill all peaks (last window), fill remaining windows with currentMax/zeros
+      if (peakIndex < targetPeaks) {
+        // if there is leftover currentMax (partial window), write it
+        if (sampleInWindow > 0 && peakIndex < targetPeaks) {
+          peaks[peakIndex++] = currentMax;
+        }
+        // fill rest with zeros
+        while (peakIndex < targetPeaks) { peaks[peakIndex++] = 0; }
+      }
+      // convert to Buffer to send back (retain float32)
+      const peaksBuffer = Buffer.from(peaks.buffer);
+      // final progress 100%
+      try { win && win.webContents && win.webContents.send('peaks-progress', { jobId: job.id, path, percent: 100, peaksComputed: targetPeaks }); } catch(e) {}
+      resolve({
+        peaks: peaksBuffer,
+        peaksCount: targetPeaks,
+        size: stat.size,
+        duration
+      });
+    });
+
+    proc.on('error', (err) => {
+      reject({ error: 'ffmpeg-error', message: err && err.message ? err.message : String(err) });
+    });
+
+    // If the main process needs to be able to cancel quickly, the cancel handler will kill proc
+  }); // end promise
+}
+
+// IPC handlers to expose to renderer ---------------------------------
+ipcMain.handle('get-file-metadata', async (event, filePath) => {
+  try {
+    const st = await fs.stat(filePath);
+    const duration = await ffprobeGetDuration(filePath);
+    return { size: st.size, mtimeMs: st.mtimeMs, duration };
+  } catch (err) {
+    return { size: 0, mtimeMs: 0, duration: 0, error: err && err.message ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle('generate-peaks', async (event, { path: filePath, peaksCount = 8192, priority = 'normal' } = {}) => {
+  if (!filePath) return { success: false, error: 'no-path' };
+  try {
+    const p = await peaksJobManager.enqueue({ path: filePath, peaksCount, priority });
+    // p is the result from runFFmpegPeaks
+    return { success: true, peaks: p.peaks, peaksCount: p.peaksCount, size: p.size, duration: p.duration };
+  } catch (err) {
+    if (err && err.cancelled) return { success: false, cancelled: true, error: err.reason || 'cancelled' };
+    return { success: false, error: err && err.message ? err.message : String(err) };
+  }
+});
+
+ipcMain.handle('cancel-peaks', async (event, { path: filePath } = {}) => {
+  if (!filePath) return { success: false };
+  const ok = peaksJobManager.cancelByPath(filePath, 'cancelled-by-renderer');
+  return { success: !!ok };
+});
+
+// Optionally emit peaks-started / peaks-done as events from enqueue/start/done above
+// but we already emit progress from parsing and final result via IPC response from generate-peaks
+// For push-style notifications you can also send events using win.webContents.send(...) as done above
+// --- END: Peaks generation worker + IPC handlers ---
+
+
+
 
 // ----------------------------------------------------------
 // default app functions
@@ -882,5 +1179,8 @@ app.whenReady().then(async () => {
   await loadShortcutsFileAndRegister(); // registrar shortcuts y watcher
   watchShortcutsFile();
 });
+
+
+
 
 // Next file is preload.js

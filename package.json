@@ -4,18 +4,19 @@
   "description": "",
   "main": "main.js",
   "scripts": {
-    "start": "electron . --verbose",
-    "rebuild": "electron-rebuild --verbose"
+    "start": "electron ."
   },
   "keywords": [],
   "author": "HostAngelDoll",
   "license": "ISC",
   "dependencies": {
     "chokidar": "^4.0.3",
-    "wavesurfer.js": "^7.10.1"
+    "ffmpeg-peaks": "^0.3.3",
+    "ffmpeg-static": "^5.2.0",
+    "ffprobe-static": "^3.1.0"
   },
   "devDependencies": {
     "electron": "^38.1.2",
-    "electron-rebuild": "^3.2.9"
+    "electron-debug": "^4.1.0"
   }
 }
