@@ -269,8 +269,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onPeaksError: (callback) => {
     ipcRenderer.removeAllListeners('peaks-error');
     ipcRenderer.on('peaks-error', (event, payload) => callback(payload));
-  }
+  },
   // --- END: peaks APIs ---
+
+  showErrorDialog: (options) => ipcRenderer.invoke('show-error-dialog', options),
 
 });
 

@@ -1,6 +1,5 @@
 // main.js
 const { app, BrowserWindow, ipcMain, Menu, dialog, shell, globalShortcut } = require('electron');
-// require('electron-debug').default();
 const path = require('path');
 const fs = require('fs').promises;
 const chokidar = require("chokidar"); 
@@ -14,6 +13,12 @@ let shortcutsWatcher = null;
 let registeredShortcuts = new Map(); // accelerator -> action
 let watchers = new Map();
 let watchdogEnabled = true; // --- WATCHDOG GLOBAL (activar/desactivar notificaciones de watchers) ---
+const child_process = require('child_process'); // ffmpeg process waveform
+let ffmpegPath = 'ffmpeg';
+try { ffmpegPath = require('ffmpeg-static'); } catch (e) { /* fallback to system ffmpeg */ }
+let ffprobePath = 'ffprobe';
+try { const _ffp = require('ffprobe-static'); ffprobePath = _ffp.path || _ffp; } catch (e) { /* fallback to system ffprobe */ }
+const SAMPLE_RATE = 44100; // PCM sample rate we'll request from ffmpeg
 let win;
 
 async function createWindow() { // main function to start app
@@ -873,13 +878,6 @@ function watchShortcutsFile() {
 
 
 // --- START: Peaks generation worker + IPC handlers (INSERT near top of main.js) ---
-const child_process = require('child_process');
-let ffmpegPath = 'ffmpeg';
-try { ffmpegPath = require('ffmpeg-static'); } catch (e) { /* fallback to system ffmpeg */ }
-let ffprobePath = 'ffprobe';
-try { const _ffp = require('ffprobe-static'); ffprobePath = _ffp.path || _ffp; } catch (e) { /* fallback to system ffprobe */ }
-
-const SAMPLE_RATE = 44100; // PCM sample rate we'll request from ffmpeg
 
 // Simple job manager for peak generation (concurrency 1, preemption support)
 const peaksJobManager = {
@@ -1139,8 +1137,8 @@ ipcMain.handle('get-file-metadata', async (event, filePath) => {
   }
 });
 
-ipcMain.handle('generate-peaks', async (event, { path: filePath, peaksCount = 8192, priority = 'normal' } = {}) => {
-  if (!filePath) return { success: false, error: 'no-path' };
+ipcMain.handle('generate-peaks', async (event, { path: filePath, peaksCount = 3000, priority = 'normal' } = {}) => {
+  if (!filePath) return { success: false, error: 'no-path' }; //8192
   try {
     const p = await peaksJobManager.enqueue({ path: filePath, peaksCount, priority });
     // p is the result from runFFmpegPeaks
@@ -1163,7 +1161,16 @@ ipcMain.handle('cancel-peaks', async (event, { path: filePath } = {}) => {
 // --- END: Peaks generation worker + IPC handlers ---
 
 
-
+ipcMain.handle('show-error-dialog', async (event, { title, message }) => {
+  const win = BrowserWindow.getFocusedWindow();
+  await dialog.showMessageBox(win, {
+    type: 'error',
+    title: title || 'Error',
+    message: message || 'Ocurrió un error.',
+    buttons: ['OK'],
+    defaultId: 0
+  });
+});
 
 // ----------------------------------------------------------
 // default app functions

@@ -22,12 +22,12 @@ List:
 - ✅ Move to recicler bin
 - ✅ Historial para desahcer operaciones de archivo
 - ✅ Global Keyboard shortcuts
-- corregir bugs de wavesfufer y cacheado de picos (operacion grande).
-- Estirilizado final de etudeplayer
+- ✅ Corregir bugs de wavesfufer y cacheado de picos en canciones largas.
+- ✅ Prohibir canciones que duren más de 60 minutos (requiere dividirlas ahora).
+- Dar estilos finales de etudeplayer
 
 
 ------------------------------------------------------------------------------------------------
-
 
   - Estirilizado y reorden de la interfaz de etudeplayer
     - icono en escritorio
@@ -40,7 +40,6 @@ List:
     - 
     - ... proximamente más detalles ...
     - ocultar menubar de desarollo de electron
-
 
 ------------------------------------------------------------------------------------------------
 

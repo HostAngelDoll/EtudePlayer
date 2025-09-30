@@ -1,1 +1,0 @@
-import subprocess; subprocess.run(["npm", "start"], cwd=r"E:\__Lab\EtudePlayer", shell=True)

@@ -77,120 +77,6 @@ document.title = originalTitle;
 // START peaksDB (IndexedDB helper) 
 // ----------------------------------------------------------------------
 
-const PEAKS_DB_NAME = 'EtudePeaksDB';
-const PEAKS_STORE = 'peaksCache';
-const PEAKS_DB_VERSION = 1;
-
-const peaksDB = {
-  db: null,
-  async open() {
-    if (this.db) return this.db;
-    return new Promise((resolve, reject) => {
-      const req = indexedDB.open(PEAKS_DB_NAME, PEAKS_DB_VERSION);
-      req.onupgradeneeded = (ev) => {
-        const db = ev.target.result;
-        if (!db.objectStoreNames.contains(PEAKS_STORE)) {
-          const store = db.createObjectStore(PEAKS_STORE, { keyPath: 'path' });
-          store.createIndex('lastAccessed', 'lastAccessed', { unique: false });
-        }
-      };
-      req.onsuccess = () => {
-        this.db = req.result;
-        resolve(this.db);
-      };
-      req.onerror = (e) => {
-        console.error('peaksDB open error', e);
-        reject(e);
-      };
-    });
-  },
-  async get(path) {
-    try {
-      const db = await this.open();
-      return new Promise((resolve, reject) => {
-        const tx = db.transaction([PEAKS_STORE], 'readonly');
-        const st = tx.objectStore(PEAKS_STORE);
-        const r = st.get(path);
-        r.onsuccess = () => {
-          const entry = r.result;
-          if (entry) {
-            // convert stored ArrayBuffer to ArrayBuffer (it is already)
-            entry.lastAccessed = Date.now();
-            // update lastAccessed (async, don't await)
-            try {
-              const txu = db.transaction([PEAKS_STORE], 'readwrite');
-              txu.objectStore(PEAKS_STORE).put(entry);
-            } catch (e) {}
-          }
-          resolve(entry || null);
-        };
-        r.onerror = () => resolve(null);
-      });
-    } catch (e) {
-      console.warn('peaksDB.get error', e);
-      return null;
-    }
-  },
-  async put(entry) {
-    // entry { path, size, mtimeMs, duration, peaksCount, peaks: ArrayBuffer, placeholder?:bool }
-    try {
-      const db = await this.open();
-      return new Promise((resolve, reject) => {
-        entry.lastAccessed = Date.now();
-        const tx = db.transaction([PEAKS_STORE], 'readwrite');
-        const st = tx.objectStore(PEAKS_STORE);
-        const r = st.put(entry);
-        r.onsuccess = () => {
-          // optionally prune if too big (implement simple prune triggered here)
-          this.pruneIfNeeded().catch(()=>{});
-          resolve(true);
-        };
-        r.onerror = (e) => { console.warn('peaksDB.put error', e); resolve(false); };
-      });
-    } catch (e) {
-      console.warn('peaksDB.put exception', e);
-      return false;
-    }
-  },
-  async delete(path) {
-    try {
-      const db = await this.open();
-      return new Promise((resolve) => {
-        const tx = db.transaction([PEAKS_STORE], 'readwrite');
-        const st = tx.objectStore(PEAKS_STORE);
-        const r = st.delete(path);
-        r.onsuccess = () => resolve(true);
-        r.onerror = () => resolve(false);
-      });
-    } catch (e) {
-      return false;
-    }
-  },
-  async listAll() {
-    try {
-      const db = await this.open();
-      return new Promise((resolve, reject) => {
-        const tx = db.transaction([PEAKS_STORE], 'readonly');
-        const st = tx.objectStore(PEAKS_STORE);
-        const r = st.getAll();
-        r.onsuccess = () => resolve(r.result || []);
-        r.onerror = () => resolve([]);
-      });
-    } catch (e) {
-      return [];
-    }
-  },
-  async pruneIfNeeded() {
-    // Simple pruning policy: limit number of entries to maxEntries
-    const maxEntries = 1000; // tune as you want
-    const all = await this.listAll();
-    if (all.length <= maxEntries) return;
-    // sort by lastAccessed ascending and delete oldest
-    all.sort((a,b) => (a.lastAccessed||0) - (b.lastAccessed||0));
-    const toDelete = all.slice(0, all.length - maxEntries);
-    for (const e of toDelete) await this.delete(e.path);
-  }
-};
 
 
 // ----------------------------------------------------------------------
@@ -273,6 +159,7 @@ async function loadPlaylistFromArray(songsArray, cacheKey, forceNext = false, ca
   // usar cache si existe y tiene contenido
   if (playlistCache[cacheKey] && Array.isArray(playlistCache[cacheKey]) && playlistCache[cacheKey].length > 0 && forceNext === false) {
     console.log('Usando cache para', cacheKey);
+    currentSongIndex = -1;
     playlist = playlistCache[cacheKey];
     updatePlaylistUI();
     return;
@@ -531,7 +418,7 @@ async function prevSongBtn() {
   if (playlist.length === 0) return;
   currentSongIndex = (currentSongIndex - 1 + playlist.length) % playlist.length;
   await playSong(currentSongIndex);
-  
+
 }
 
 async function nextSongBtn() {
@@ -1951,7 +1838,7 @@ function pushHistory(item) {
   console.log('history push:', item);
 }
 
-/** Helper: normalizar path para comparación (windows/unix) */ 
+/** Helper: normalizar path para comparación (windows/unix) */
 function normalizePathForCompare(p) {
   if (!p || typeof p !== 'string') return '';
   return p.replace(/\//g, '\\').toLowerCase();
@@ -2307,8 +2194,8 @@ async function undoLastAction() {
               //   // Fallback: recargar la página para evitar inconsistencias
               //   location.reload();
               // }
-              
-              
+
+
 
             } catch (e) {
               console.warn('No se pudo refrescar árbol tras undo renameFolder:', e);
@@ -2445,6 +2332,121 @@ window.electronAPI.onShortcutAction(async ({ action } = {}) => {
 // Wavepeaks processor
 // ----------------------------------------------------------------------------
 
+const PEAKS_DB_NAME = 'EtudePeaksDB';
+const PEAKS_STORE = 'peaksCache';
+const PEAKS_DB_VERSION = 1;
+
+const peaksDB = {
+  db: null,
+  async open() {
+    if (this.db) return this.db;
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(PEAKS_DB_NAME, PEAKS_DB_VERSION);
+      req.onupgradeneeded = (ev) => {
+        const db = ev.target.result;
+        if (!db.objectStoreNames.contains(PEAKS_STORE)) {
+          const store = db.createObjectStore(PEAKS_STORE, { keyPath: 'path' });
+          store.createIndex('lastAccessed', 'lastAccessed', { unique: false });
+        }
+      };
+      req.onsuccess = () => {
+        this.db = req.result;
+        resolve(this.db);
+      };
+      req.onerror = (e) => {
+        console.error('peaksDB open error', e);
+        reject(e);
+      };
+    });
+  },
+  async get(path) {
+    try {
+      const db = await this.open();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction([PEAKS_STORE], 'readonly');
+        const st = tx.objectStore(PEAKS_STORE);
+        const r = st.get(path);
+        r.onsuccess = () => {
+          const entry = r.result;
+          if (entry) {
+            // convert stored ArrayBuffer to ArrayBuffer (it is already)
+            entry.lastAccessed = Date.now();
+            // update lastAccessed (async, don't await)
+            try {
+              const txu = db.transaction([PEAKS_STORE], 'readwrite');
+              txu.objectStore(PEAKS_STORE).put(entry);
+            } catch (e) { }
+          }
+          resolve(entry || null);
+        };
+        r.onerror = () => resolve(null);
+      });
+    } catch (e) {
+      console.warn('peaksDB.get error', e);
+      return null;
+    }
+  },
+  async put(entry) {
+    // entry { path, size, mtimeMs, duration, peaksCount, peaks: ArrayBuffer, placeholder?:bool }
+    try {
+      const db = await this.open();
+      return new Promise((resolve, reject) => {
+        entry.lastAccessed = Date.now();
+        const tx = db.transaction([PEAKS_STORE], 'readwrite');
+        const st = tx.objectStore(PEAKS_STORE);
+        const r = st.put(entry);
+        r.onsuccess = () => {
+          // optionally prune if too big (implement simple prune triggered here)
+          this.pruneIfNeeded().catch(() => { });
+          resolve(true);
+        };
+        r.onerror = (e) => { console.warn('peaksDB.put error', e); resolve(false); };
+      });
+    } catch (e) {
+      console.warn('peaksDB.put exception', e);
+      return false;
+    }
+  },
+  async delete(path) {
+    try {
+      const db = await this.open();
+      return new Promise((resolve) => {
+        const tx = db.transaction([PEAKS_STORE], 'readwrite');
+        const st = tx.objectStore(PEAKS_STORE);
+        const r = st.delete(path);
+        r.onsuccess = () => resolve(true);
+        r.onerror = () => resolve(false);
+      });
+    } catch (e) {
+      return false;
+    }
+  },
+  async listAll() {
+    try {
+      const db = await this.open();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction([PEAKS_STORE], 'readonly');
+        const st = tx.objectStore(PEAKS_STORE);
+        const r = st.getAll();
+        r.onsuccess = () => resolve(r.result || []);
+        r.onerror = () => resolve([]);
+      });
+    } catch (e) {
+      return [];
+    }
+  },
+  async pruneIfNeeded() {
+    // Simple pruning policy: limit number of entries to maxEntries
+    const maxEntries = 1000; // tune as you want
+    const all = await this.listAll();
+    if (all.length <= maxEntries) return;
+    // sort by lastAccessed ascending and delete oldest
+    all.sort((a, b) => (a.lastAccessed || 0) - (b.lastAccessed || 0));
+    const toDelete = all.slice(0, all.length - maxEntries);
+    for (const e of toDelete) await this.delete(e.path);
+  }
+};
+
 
 // Helper: single creation of audioContext + eqFilters (lazy)
 function ensureEQFilters() {
@@ -2478,36 +2480,66 @@ function makePlaceholderPeaks(count = 8192) {
   return arr;
 }
 
+function downsamplePeaks(peaks, maxPeaks = 2000) {
+  const factor = Math.ceil(peaks.length / maxPeaks);
+  if (factor <= 1) return peaks;
+  const reduced = new Float32Array(Math.ceil(peaks.length / factor));
+  for (let i = 0; i < reduced.length; i++) {
+    reduced[i] = peaks[i * factor];
+  }
+  return reduced;
+}
+
 async function playSong(index) {
   if (playlist.length === 0) return;
-
-  if (wavesurfer && wavesurfer.isPlaying()) {
-    wavesurfer.stop();
-    clearPlayingStyle()
-    document.title = originalTitle;
-    statusBar.textContent = "Loading...";
-  }
 
   songPath = playlist[index].path || playlist[index];
   currentSongIndex = index;
 
+  if (wavesurfer && wavesurfer.isPlaying()) {
+    wavesurfer.stop();
+    clearPlayingStyle();
+    document.title = originalTitle;
+    statusBar.textContent = "Loading...";
+    totalDurLabel.textContent = "0:00";
+    currentDurLabel.textContent = "0:00";
+    leftDurLabel.textContent = "0:00";
+  }
+
   try {
     // Obtener metadata desde main (size, mtimeMs, duration)
+    const TO_MIN = 60;
     const meta = await window.electronAPI.getFileMetadata(songPath);
     const durationSec = parseFloat(meta.duration || 0);
 
-    const isLong = durationSec > 20 * 60; // 20 minutes threshold
+    if (durationSec > (60 * TO_MIN)) {
+      clearPlayingStyle();
+      await window.electronAPI.showErrorDialog({
+        title: "Archivo con duracion prohibida",
+        message: "Esta canción dura más de 60 minutos y requiere que la dividas en partes",
+      });
+      statusBar.textContent = "Esta cancion requiere que la divididas en partes"
+      return;
+    }
+
+    const isLong = durationSec > (20 * TO_MIN);
 
     if (isLong) {
       // comprobar cache
       const cached = await peaksDB.get(songPath);
-      const validCache = cached && cached.size === meta.size && cached.mtimeMs === meta.mtimeMs && Math.abs((cached.duration||0) - durationSec) < 0.6;
+      const validCache = cached && cached.size === meta.size && cached.mtimeMs === meta.mtimeMs && Math.abs((cached.duration || 0) - durationSec) < 0.6;
 
       if (validCache && cached.peaks && cached.peaks instanceof ArrayBuffer) {
         // usar cache
-        console.log("Cargando cache de onda de picos")
+        console.log("Cargando cache de onda de picos");
+        await new Promise(resolve => setTimeout(resolve, 50));
         const peaksFloat = new Float32Array(cached.peaks);
-        await initWaveform(songPath, peaksFloat);
+        console.log('Peaks size:', peaksFloat.length, 'Approx memory:', peaksFloat.length * 4 / 1024, 'KB');
+        const durationMinutes = durationSec / 60;
+        const maxPeaks = Math.min(1000 + durationMinutes * 10, 8192);
+        const reducedPeaks = downsamplePeaks(peaksFloat, maxPeaks);
+        console.log('Peaks size compresed:', reducedPeaks.length, 'Approx memory:', reducedPeaks.length * 4 / 1024, 'KB');
+        await initWaveform(songPath, reducedPeaks);
         wavesurfer.setVolume(volumeSlider.value / 100);
         wavesurfer.play();
       } else {
@@ -2518,7 +2550,7 @@ async function playSong(index) {
         // subscribe a progress events
         const onProgress = (p) => {
           if (!p || !p.path || normalizePathForCompare(p.path) !== normalizePathForCompare(songPath)) return;
-          const percent = (typeof p.percent === 'number') ? p.percent/100 : 0;
+          const percent = (typeof p.percent === 'number') ? p.percent / 100 : 0;
           showProgressNotification('Generando forma de onda...', percent);
         };
         window.electronAPI.onPeaksProgress(onProgress);
@@ -2526,7 +2558,10 @@ async function playSong(index) {
         // If there is currently a peaks job and the user opens another long file,
         // main.job manager will apply preemption rules. Here we simply request generation.
         console.log("Generando onda de picos para wavesufer");
-        const peaksCount = 8192; // tuneable
+        // ⚠️ Permite que el navegador pinte antes de trabajo pesado
+        await new Promise(resolve => setTimeout(resolve, 50));
+        const durationMinutes = durationSec / 60;
+        const peaksCount = Math.min(2000 + durationMinutes * 10, 8192); //8192; // tuneable
         const res = await window.electronAPI.generatePeaks({ path: songPath, peaksCount });
         console.log("La onda de picos se ha generado");
 
@@ -2551,17 +2586,27 @@ async function playSong(index) {
             createdAt: Date.now()
           });
 
-          console.log("Playing with new precreated peaks")
+          console.log("Playing with new precreated peaks");
+          await new Promise(resolve => setTimeout(resolve, 50));
           const peaksFloat = new Float32Array(ab);
-          await initWaveform(songPath, peaksFloat);
+          console.log('Peaks size:', peaksFloat.length, 'Approx memory:', peaksFloat.length * 4 / 1024, 'KB');
+          const durationMinutes = durationSec / 60;
+          const maxPeaks = Math.min(1000 + durationMinutes * 10, 8192);
+          const reducedPeaks = downsamplePeaks(peaksFloat, maxPeaks);
+          console.log('Peaks size compresed:', reducedPeaks.length, 'Approx memory:', reducedPeaks.length * 4 / 1024, 'KB');
+          await initWaveform(songPath, reducedPeaks);
           wavesurfer.setVolume(volumeSlider.value / 100);
           wavesurfer.play();
 
         } else {
           // failure or cancelled -> fallback placeholder so waveform is visible (flat)
           console.warn('generatePeaks failed or cancelled', res);
-          const placeholder = makePlaceholderPeaks(8192);
-          await initWaveform(songPath, placeholder);
+          await new Promise(resolve => setTimeout(resolve, 50));
+          const durationMinutes = durationSec / 60;
+          const maxPeaks = Math.min(1000 + durationMinutes * 10, 8192);
+          const placeholder = makePlaceholderPeaks(maxPeaks); //8192
+          const reducedPeaks = downsamplePeaks(placeholder, 900);
+          await initWaveform(songPath, reducedPeaks);
           wavesurfer.setVolume(volumeSlider.value / 100);
           wavesurfer.play();
           showProgressNotification('No se pudo generar forma de onda — usando placeholder', 1, true, 4000);
@@ -2604,12 +2649,14 @@ function initWaveform(audioPath, precomputedPeaks = null) {
       progressColor: _progress_Color,
       cursorColor: _cursor_color,
       minPxPerSec: 0.1, // allow wavesurfer to economize pixels for long files
+      pixelRatio: 1,
       height: 30,
+      autoCenter: false,
       responsive: true,
       partialRender: true,
       fillParent: true,
       hideScrollbar: true,
-      autoScroll: false, 
+      autoScroll: false,
       //backend: 'WebAudio' // ensure WebAudio backend for filters
     };
 
@@ -2629,7 +2676,9 @@ function initWaveform(audioPath, precomputedPeaks = null) {
       apagarVideoPlayer();
       wavesurfer = WaveSurfer.create(commonOpts);
       // if we have precomputed peaks, create will draw instantly from peaks. Still need to call load.
-      wavesurfer.load(audioPath);
+      setTimeout(() => {
+        wavesurfer.load(audioPath);
+      }, 0);
     }
 
     // Initialize volume/pitch UI state
@@ -2668,7 +2717,7 @@ function initWaveform(audioPath, precomputedPeaks = null) {
             // createMediaElementSource for this element and wire to filters
             try {
               if (mediaNode) {
-                try { mediaNode.disconnect(); } catch (e) {}
+                try { mediaNode.disconnect(); } catch (e) { }
               }
               mediaNode = audioContext.createMediaElementSource(mediaEl);
             } catch (e) {
