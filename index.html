@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 
 <head>
   <meta charset="UTF-8"> <!-- Obligatory -->
@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="css/alert_modal.css">
   <link rel="stylesheet" href="css/input_modal.css">
   <link rel="stylesheet" href="css/treeview.css">
+  <link rel="stylesheet" href="css/font-awesome.min.css">
   <script src="wavesurfer.min.js"></script>
   <script src="custom_modal.js"></script>
   <script src="alert.modal.js"></script>
@@ -25,9 +26,173 @@
     </div>
   </div>
 
-  <h1>🎵 EtudePlayer</h1>
+  <div class="container">
 
-  <div id="controls">
+    <!-- ActivityBar lateral izquierda -->
+    <div class="activitybar">
+      <div class="activitybar-item active" data-view="explorer">
+        <span class="icon icon-explorer"></span>
+      </div>
+      <div class="activitybar-item" data-view="search">
+        <span class="icon icon-search"></span>
+      </div>
+      <div class="activitybar-item" data-view="settings">
+        <span class="icon icon-settings"></span>
+      </div>
+    </div>
+
+    <!-- Sidebar para TreeView -->
+    <div id="tree" class="sidebar"></div>
+
+    <!-- Contenido principal con pestañas -->
+    <div class="main-content">
+
+      <div class="tabs-container">
+        <div class="tab active" data-tab="tab1">
+          Playlist
+          <span class="tab-close">×</span>
+        </div>
+        <div class="tab" data-tab="tab2">
+          Video
+          <span class="tab-close">×</span>
+        </div>
+        <div class="tab" data-tab="tab3">
+          Settings
+          <span class="tab-close">×</span>
+        </div>
+      </div>
+
+      <div class="tab-content active" id="tab1">
+
+        <table id="playlist" class="playlist">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Duración</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Canciones aquí -->
+          </tbody>
+        </table>
+
+      </div>
+
+      <div class="tab-content" id="tab2">
+        <div id="videoContainer" style="display:none; text-align:center; width: 100%; background-color: black;">
+          <video id="videoPlayer" controls playsinline style="width:100%; max-width:600px;"></video>
+        </div>
+
+      </div>
+
+      <div class="tab-content" id="tab3">
+        <h2>Configuración</h2>
+        <p>Personaliza la aplicación según tus preferencias.</p>
+        <div style="margin-top: 20px;">
+          <h3>Opciones disponibles:</h3>
+          <div style="margin-top: 10px;">
+            <label>
+              <input type="checkbox" checked> Tema oscuro
+            </label>
+          </div>
+          <div style="margin-top: 10px;">
+            <label>
+              <input type="checkbox"> Mostrar números de línea
+            </label>
+          </div>
+          <div style="margin-top: 10px;">
+            <label>
+              <input type="checkbox" checked> Auto-guardado
+            </label>
+          </div>
+          <div style="margin-top: 20px;">
+            <button
+              style="padding: 8px 16px; background-color: #0e639c; color: white; border: none; border-radius: 3px; cursor: pointer;">
+              Guardar configuración
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- StatusBar con PlaybackBar desplegable -->
+  <div class="statusbar">
+
+    <div class="statusbar-left">
+
+      <div class="statusbar-right">
+        <div class="statusbar-item toggle-playback" id="togglePlayback">
+          <i class="fa fa-play-circle" aria-hidden="true"></i>
+          Playback
+        </div>
+      </div>
+
+      <div class="statusbar-item" id="statusBar">
+        EtudePlayer
+      </div>
+
+    </div>
+
+    <div class="playbackbar" id="playbackBar">
+
+      <div class="playbackbar-container">
+
+        <div class="playback-seekbar">
+          <span id="ctdur"><span id="currentDur">0:00</span> / <span id="totalDur">0:00</span></span>
+          <div id="waveform"></div>
+          <span id="leftDur">0:00</span>
+        </div>
+
+        <div class="playback-controls">
+
+          <div class="playback-controls-izq">
+            <button class="playback-btn" id="playPauseBtn"><i class="fa fa-play" aria-hidden="true"></i></button>
+            <button class="playback-btn" id="stopBtn"><i class="fa fa-stop" aria-hidden="true"></i></button>
+            <button class="playback-btn" id="prevBtn"><i class="fa fa-step-backward" aria-hidden="true"></i></button>
+            <button class="playback-btn" id="nextBtn"><i class="fa fa-step-forward" aria-hidden="true"></i></button>
+            <button class="playback-btn" id="openTrashBtn"><i class="fa fa-recycle" aria-hidden="true"></i></button>
+            <button class="playback-btn" id="openEqualizer">𖤐</button>
+            <button class="playback-btn" id="stopOnFinish">↩</button>
+
+            <div>
+              <label for="pitchSlider">Rate:</label>
+              <input type="range" id="pitchSlider" min="0.98" max="1.04" step="0.01" value="1.0">
+              <input type="number" id="pitchInput" min="0.98" max="1.04" step="0.01" value="1.0">
+            </div>
+
+            <label>
+              <input type="checkbox" id="stopAfterCheckbox">
+              Stop on finish
+            </label>
+
+          </div>
+
+          <div class="playback-controls-der">
+
+            <button class="playback-btn" id="btnMute"></button>
+
+            <div id="volumeControl">
+              <button class="playback-btn" id="btnVolDown"><i class="fa fa-volume-down" aria-hidden="true"></i></button>
+              <input type="range" id="volumeSlider" min="0" max="100" value="10">
+              <button class="playback-btn" id="btnVolUp"><i class="fa fa-volume-up" aria-hidden="true"></i></button>
+              <span id="volumeLabel">10%</span>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- Ecualizer Modal -->
+  <div id="controls" style="display: none;">
     <button id="prevBtn">⏮️ Anterior</button>
     <button id="playPauseBtn">▶️/⏸️</button>
     <button id="nextBtn">⏭️ Siguiente</button>
@@ -129,56 +294,36 @@
 
   </div>
 
-  <h2>Playlist</h2>
-  <table id="playlist" class="playlist">
-    <thead>
-      <tr>
-        <th>Nombre</th>
-        <th>Duración</th>
-      </tr>
-    </thead>
-    <tbody>
-      <!-- Canciones aquí -->
-    </tbody>
-  </table>
-
-  <h2>Folder Bar</h2>
-  <div id="tree"></div>
-
   <!-- MOVE-TO-FOLDER MODAL -->
-  <div class="modal-overlay"
-     id="moveModalOverlay"
-     aria-hidden="true"
-     inert>
-     
-  <div class="move-modal"
-       role="dialog"
-       aria-modal="true"
-       aria-labelledby="moveModalTitle">
-       
-    <div class="modal-header">
-      <strong id="moveModalTitle">Seleccionar carpeta destino</strong>
-      <button class="close-btn" id="moveModalCloseBtn" title="Cerrar">✖</button>
-    </div>
+  <div class="modal-overlay" id="moveModalOverlay" aria-hidden="true" inert>
 
-    <div class="modal-topbar">
-      <div style="flex:1"></div>
-      <div class="current-path" id="moveCurrentPath" title="Ruta actual">E:\_Internal</div>
-    </div>
+    <div class="move-modal" role="dialog" aria-modal="true" aria-labelledby="moveModalTitle">
 
-    <div id="moveTreeContainer" aria-live="polite">
-      <!-- árbol dinámico -->
-    </div>
+      <div class="modal-header">
+        <strong id="moveModalTitle">Seleccionar carpeta destino</strong>
+        <button class="close-btn" id="moveModalCloseBtn" title="Cerrar">✖</button>
+      </div>
 
-    <div class="modal-actions">
-      <button id="moveCancelBtn">Cancelar</button>
-      <button id="moveConfirmBtn" disabled>Mover</button>
-    </div>
+      <div class="modal-topbar">
+        <div style="flex:1"></div>
+        <div class="current-path" id="moveCurrentPath" title="Ruta actual">E:\_Internal</div>
+      </div>
 
+      <div id="moveTreeContainer" aria-live="polite">
+        <!-- árbol dinámico -->
+      </div>
+
+      <div class="modal-actions">
+        <button id="moveCancelBtn">Cancelar</button>
+        <button id="moveConfirmBtn" disabled>Mover</button>
+      </div>
+
+    </div>
   </div>
-</div>
 
+  <script src="uixs.js"></script>
   <script src="renderer.js"></script>
+
 </body>
 
 </html>

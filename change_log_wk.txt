@@ -37,9 +37,21 @@ List:
     - el árbol de las carpetas sera una activity bar
       - el contenido interno de las carpetas de año seguira siendo una treeview
       - la playlist estara en el resto de la pantalla
-    - 
+      - el slider del pitch sera de 2.0 a 1.04 maximo y minimo nuevo 0.98
+    - scrollbar con tema claro y obscuro
+    - boton para "stop on finish".
+    - playback rate slider en ecualizador dialogo.
+    - ecualizador como cuadro de dialogo.
+    - progreso de playlist, cambios y cargas en la ventana pestaña de playlist.
+    - cabezal de playlist siempre visible aun si se hace scroll.
+    - corregir colores y estilos en dialogos.
+    - ajustes en la notify tooltip al momento de mostrar playbackbar.
+    - boton para abrir reciclaje sera en el menu contextual de los archivos.
+    - cambiar icono de ecualizador en la playbackbar.
+    - ajustar colores para temás de modo obscuro y claro.
+    - ajustar detalles para la interfaz vscode.
     - ... proximamente más detalles ...
-    - ocultar menubar de desarollo de electron
+    - ocultar menubar de desarollo de electron y mostrar el nuestro.
 
 ------------------------------------------------------------------------------------------------
 

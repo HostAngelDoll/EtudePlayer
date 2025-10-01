@@ -628,7 +628,7 @@ async function initializeSavedCache() {
 function updateVolumeUI(volume) {
   volumeSlider.value = Math.round(volume * 100);
   volumeLabel.textContent = `${volumeSlider.value}%`;
-  btnMute.textContent = isMuted ? 'Unmute' : 'Mute';
+  btnMute.textContent = isMuted ? '♫⃠' : '♫';
 }
 
 function applyVolume() {
@@ -636,13 +636,13 @@ function applyVolume() {
 }
 
 function volumeUp() {
-  currentVolume = Math.min(1, currentVolume + 0.1);
+  currentVolume = Math.min(1, currentVolume + 0.05);
   if (!isMuted) applyVolume();
   updateVolumeUI(currentVolume);
 }
 
 function volumeDown() {
-  currentVolume = Math.max(0, currentVolume - 0.1);
+  currentVolume = Math.max(0, currentVolume - 0.05);
   if (!isMuted) applyVolume();
   updateVolumeUI(currentVolume);
 }
@@ -2670,7 +2670,7 @@ function initWaveform(audioPath, precomputedPeaks = null) {
       crearVideoPlayer(audioPath);
       wavesurfer = WaveSurfer.create({
         ...commonOpts,
-        media: videoPlayer
+        media: document.getElementById('videoPlayer')
       });
     } else {
       apagarVideoPlayer();
