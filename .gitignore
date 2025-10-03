@@ -1,6 +1,7 @@
 .vscode/
 private/
-.venv/
+/.venv/
 node_modules/
-docs/
+/docs/
 test/
+/dist/
