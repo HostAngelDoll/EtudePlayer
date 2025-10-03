@@ -25,5 +25,6 @@ files:
       - package.json
       - '!README.md'
 win:
+  icon: assets/icon_tb.ico
   target: nsis
 electronVersion: 38.1.2

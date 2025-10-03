@@ -43,13 +43,14 @@
       "!LICENCE",
       "main.js",
       "package-lock.json",
-      "package.json",      
+      "package.json",
       "!README.md"
     ],
     "directories": {
       "output": "dist"
     },
     "win": {
+      "icon": "assets/icon_tb.ico",
       "target": "nsis"
     }
   }

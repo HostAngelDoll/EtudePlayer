@@ -5,3 +5,4 @@ node_modules/
 /docs/
 test/
 /dist/
+dist/builder-effective-config.yaml
