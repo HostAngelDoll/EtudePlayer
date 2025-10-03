@@ -1,0 +1,29 @@
+directories:
+  output: dist
+  buildResources: build
+appId: com.hostangeldoll.etudeplayer
+productName: EtudePlayer
+files:
+  - filter:
+      - '!dist/'
+      - '!node_modules/.cache'
+      - '!.venv/**'
+      - '!.vscode/**'
+      - assets/**/*
+      - css/**/*
+      - '!docs/**/*'
+      - fonts/**/*
+      - html/**/*
+      - js/**/*
+      - json/**/*
+      - '!private/'
+      - '!test/**/*'
+      - '!.gitignore'
+      - '!LICENCE'
+      - main.js
+      - package-lock.json
+      - package.json
+      - '!README.md'
+win:
+  target: nsis
+electronVersion: 38.1.2

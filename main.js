@@ -8,7 +8,7 @@ const XMAS_START_YEAR = 2004;
 const XMAS_END_YEAR = 2021;
 const ROOT_YEARS_PATH = "E:\\_Internal";
 const TRASH_FOLDER = "E:\\_Exclude\\l_reallydeleted";
-const SHORTCUTS_PATH = path.join(process.cwd(), 'shortcuts.json'); // raíz del proyecto
+const SHORTCUTS_PATH = path.join(process.cwd(), 'json/shortcuts.json'); // raíz del proyecto
 let shortcutsWatcher = null;
 let registeredShortcuts = new Map(); // accelerator -> action
 let watchers = new Map();
@@ -28,12 +28,12 @@ async function createWindow() { // main function to start app
     title: 'EtudePlayer',
     icon: path.join(__dirname, 'assets/icon_tb.png'),
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'), // usar preload seguro
+      preload: path.join(__dirname, 'js/preload.js'), // usar preload seguro
       contextIsolation: true,                      // habilitar aislamiento
       nodeIntegration: false                       // desactivar para seguridad
     }
   });
-  win.loadFile('index.html');
+  win.loadFile('html/index.html');
   win.setMenu(null);
 }
 

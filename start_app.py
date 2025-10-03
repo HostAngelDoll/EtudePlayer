@@ -1,1 +1,0 @@
-import subprocess; subprocess.run(["electron", "."], cwd=r"E:\__Lab\EtudePlayer", shell=True)

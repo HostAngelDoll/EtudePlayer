@@ -4,7 +4,9 @@
   "description": "Etude Management Media Center",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "build": "electron-builder",
+    "dist": "electron-builder --dir"
   },
   "keywords": [],
   "author": "HostAngelDoll",
@@ -17,6 +19,38 @@
   },
   "devDependencies": {
     "electron": "^38.1.2",
+    "electron-builder": "^26.0.12",
     "electron-debug": "^4.1.0"
+  },
+  "build": {
+    "appId": "com.hostangeldoll.etudeplayer",
+    "productName": "EtudePlayer",
+    "files": [
+      "!dist/",
+      "!node_modules/.cache",
+      "!.venv/**",
+      "!.vscode/**",
+      "assets/**/*",
+      "css/**/*",
+      "!docs/**/*",
+      "fonts/**/*",
+      "html/**/*",
+      "js/**/*",
+      "json/**/*",
+      "!private/",
+      "!test/**/*",
+      "!.gitignore",
+      "!LICENCE",
+      "main.js",
+      "package-lock.json",
+      "package.json",      
+      "!README.md"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis"
+    }
   }
 }

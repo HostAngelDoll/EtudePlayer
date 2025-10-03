@@ -1,4 +1,6 @@
+.vscode/
+private/
+.venv/
 node_modules/
-node_disabled/
-ffmpeg-binaries/
 docs/
+test/
