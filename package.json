@@ -36,7 +36,7 @@
       "fonts/**/*",
       "html/**/*",
       "js/**/*",
-      "json/**/*",
+      "json/**",
       "!private/",
       "!test/**/*",
       "!.gitignore",

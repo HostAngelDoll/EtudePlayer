@@ -842,22 +842,37 @@ function handleGlobalShortcut(action) {
 async function loadShortcutsFileAndRegister() {
   try {
     let raw = '{}';
+
     try {
       raw = await fs.readFile(SHORTCUTS_PATH, 'utf8');
     } catch (e) {
-      console.warn(`[shortcuts] ${SHORTCUTS_PATH} no encontrado — sin atajos registrados`);
+      await dialog.showMessageBox({
+        type: 'warning',
+        title: 'Atajos no encontrados',
+        message: `[shortcuts] ${SHORTCUTS_PATH} no encontrado — sin atajos registrados`
+      });
       return;
     }
+
     let parsed = {};
     try {
       parsed = JSON.parse(raw);
     } catch (e) {
-      console.warn('[shortcuts] JSON inválido en shortcuts.json — ignorado');
+      await dialog.showMessageBox({
+        type: 'warning',
+        title: 'JSON inválido',
+        message: '[shortcuts] JSON inválido en shortcuts.json — ignorado'
+      });
       return;
     }
+
     registerShortcutsFromMap(parsed);
+
   } catch (err) {
-    console.error('[shortcuts] error en loadShortcutsFileAndRegister:', err);
+    dialog.showErrorBox(
+      'Error al cargar atajos',
+      `[shortcuts] error en loadShortcutsFileAndRegister:\n\n${err.message}`
+    );
   }
 }
 
