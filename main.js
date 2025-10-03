@@ -34,7 +34,16 @@ async function createWindow() { // main function to start app
     }
   });
   win.loadFile('index.html');
+  win.setMenu(null);
+}
 
+async function directoryExists(dirPath) {
+  try {
+    await fs.access(dirPath); // Verifica si se puede acceder al directorio
+    return true;
+  } catch (err) {
+    return false;
+  }
 }
 
 async function getFolderNodes(folderPath) {
@@ -1182,6 +1191,16 @@ app.on('will-quit', () => { try { globalShortcut.unregisterAll(); } catch (e) { 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 
 app.whenReady().then(async () => {
+  const exists = await directoryExists(ROOT_YEARS_PATH);
+  if (!exists) {
+    dialog.showErrorBox(
+      'Error de directorio (unidad desconectada)',
+      `El directorio "${ROOT_YEARS_PATH}" no existe o no esta conectada la unidad. La aplicación se cerrará.`
+    );
+    app.quit();
+    return;
+  }
+
   await createWindow();
   await loadShortcutsFileAndRegister(); // registrar shortcuts y watcher
   watchShortcutsFile();
