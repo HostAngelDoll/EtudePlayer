@@ -841,29 +841,53 @@ function handleGlobalShortcut(action) {
 
 async function loadShortcutsFileAndRegister() {
   try {
-    let raw = '{}';
+    const defaultShortcuts = {
+      "ctrl+num1": "seekBack10",
+      "ctrl+num2": "nextSong",
+      "ctrl+num3": "seekForward10",
+      "ctrl+num4": "previousSong",
+      "ctrl+num5": "playPause",
+      "ctrl+num6": "toggleWindow",
+      "ctrl+num7": "volumeDown",
+      "ctrl+num8": "playRandom",
+      "ctrl+num9": "volumeUp",
+      "ctrl+num0": "stopSong"
+    };
+
+    let parsed = {};
 
     try {
-      raw = await fs.readFile(SHORTCUTS_PATH, 'utf8');
+      // Intentar leer el archivo
+      const raw = await fs.readFile(SHORTCUTS_PATH, 'utf8');
+      try {
+        parsed = JSON.parse(raw);
+      } catch (e) {
+        // JSON inválido
+        await dialog.showMessageBox({
+          type: 'warning',
+          title: 'JSON inválido',
+          message: '[shortcuts] JSON inválido en shortcuts.json — se usarán los atajos por defecto'
+        });
+        parsed = defaultShortcuts;
+      }
     } catch (e) {
+      // Archivo no existe: usar por defecto y crearlo
       await dialog.showMessageBox({
         type: 'warning',
         title: 'Atajos no encontrados',
-        message: `[shortcuts] ${SHORTCUTS_PATH} no encontrado — sin atajos registrados`
+        message: `[shortcuts] ${SHORTCUTS_PATH} no encontrado — se usarán los atajos por defecto`
       });
-      return;
-    }
+      parsed = defaultShortcuts;
 
-    let parsed = {};
-    try {
-      parsed = JSON.parse(raw);
-    } catch (e) {
-      await dialog.showMessageBox({
-        type: 'warning',
-        title: 'JSON inválido',
-        message: '[shortcuts] JSON inválido en shortcuts.json — ignorado'
-      });
-      return;
+      try {
+        await fs.writeFile(SHORTCUTS_PATH, JSON.stringify(defaultShortcuts, null, 2), 'utf8');
+      } catch (writeErr) {
+        await dialog.showMessageBox({
+          type: 'error',
+          title: 'Error al crear archivo',
+          message: `[shortcuts] No se pudo crear shortcuts.json:\n\n${writeErr.message}`
+        });
+      }
     }
 
     registerShortcutsFromMap(parsed);
