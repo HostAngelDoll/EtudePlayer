@@ -29,3 +29,34 @@
   border-radius: 3px;
   transition: width 0.2s;
 }
+
+
+/* notification for playlist */
+#progressPlaylistHead {
+  width: 100%;
+  right: 20px;
+  bottom: 20px;
+  background: #1e1e1e;
+  color: #ccc;
+  border: 1px solid #333;
+  font-size: 13px;
+  display: none;
+  padding: 10px;
+  z-index: 22000;
+}
+
+#progressBarPlaylist {
+  width: 100%;
+  height: 6px;
+  background: #333;
+  border-radius: 3px;
+  margin-top: 8px;
+}
+
+#progressFillPlaylist {
+  height: 100%;
+  width: 0%;
+  background: #f30487;
+  border-radius: 3px;
+  transition: width 0.2s;
+}

@@ -1,7 +1,7 @@
 {
   "name": "etudeplayer",
-  "version": "1.0.0",
-  "description": "",
+  "version": "0.7.1",
+  "description": "Etude Management Media Center",
   "main": "main.js",
   "scripts": {
     "start": "electron ."

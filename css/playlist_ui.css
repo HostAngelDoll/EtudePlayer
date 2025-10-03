@@ -1,4 +1,13 @@
+#durationCol {
+  max-width: 116px;
+  width: 116px;           /* Establece un ancho deseado */
+  white-space: nowrap;    /* Evita que el texto se divida en varias líneas */
+  overflow: hidden;       /* Oculta cualquier contenido que exceda el ancho */
+  text-overflow: ellipsis;/* Agrega "..." si el texto es muy largo */
+}
+
 .playlist {
+  user-select: none;
   border-collapse: collapse;
   width: 100%;
 }
@@ -13,19 +22,31 @@
   cursor: pointer;
 }
 
+.playlist tr:hover {
+  background-color: rgb(53, 53, 53);
+}
+
 .playlist tr.selected {
-  background-color: #007acc;
+  background-color: #787878;
   color: white;
 }
 
 .playlist tr.playing {
   font-weight: bold;         /* negrita para la canción que se reproduce */
-  background-color: #99ccff; /* fondo azul más intenso */
-  color:black;
+  background-color: transparent;
+  color:rgb(255, 94, 217);
 }
 
 .playlist tr.selected.playing {
-  background-color: #0060a0;   /* color de fondo seleccionado */
-  color: white;                /* texto blanco */
-  font-weight: bold;           /* texto en negrita */
+  background-color: #787878;
+  color: white;
+}
+
+
+#playlist thead th {
+  position: sticky;
+  cursor: default;
+  top: 0px;
+  background-color: #2f2f34; /* O el color de fondo que necesites */
+  z-index: 1;
 }

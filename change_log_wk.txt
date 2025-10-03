@@ -29,14 +29,6 @@ List:
 
 ------------------------------------------------------------------------------------------------
 
-npm install electron-reload --save-dev
-
-require('electron-reload')(__dirname, {
-  electron: require(`${__dirname}/node_modules/electron`)
-});
-
-"npx electron ." o "npm start"
-
   - Estirilizado y reorden de la interfaz de etudeplayer
     - icono en escritorio
     - seleccion de modo claro u obscuro manual y deteccion del tema a usar (windows)

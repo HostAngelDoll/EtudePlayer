@@ -1,7 +1,7 @@
 #eqContainer {
   display: flex;
-  align-items: flex-end; /* que las etiquetas queden arriba de los sliders */
-  gap: 6px; /* espacio entre sliders */
+  align-items: flex-start;
+  gap: 4px;
 }
 
 .eqBand {
@@ -12,13 +12,146 @@
 
 .eqLabel {
   font-size: 0.8em;
-  margin-bottom: 4px;
+  margin-bottom: 7px;
   text-align: center;
+  color: rgb(255, 255, 255);
 }
 
 #eqContainer input[type="range"] {
   writing-mode: vertical-lr;
   direction: rtl;
-  width: 30px; /* ancho del slider */
-  height: 150px; /* alto del slider */
+  width: 30px;
+  height: 150px;
+}
+
+#headEq {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#playrateHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#titleModal {
+  color: white;
+  font-weight: 500;
+  font-size: 14pt;
+}
+
+#titleSec1 {
+  color: white;
+  font-weight: 500;
+  font-size: 14pt;
+}
+
+/* Botón cerrar (X) */
+#closeEqBtn {
+  display: flex;
+  justify-content: center;
+  font-size: 16pt;
+  font-weight: bold;
+  text-align: center;
+  border: none;
+  cursor: pointer;
+  color: #888;
+  background-color: transparent;
+  z-index: 1010;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  line-height: 23px;
+}
+
+#closeEqBtn:hover {
+  color: #fff;
+}
+
+/* Botón de restablecer */
+#resetEQ {
+  font-size: 16pt;
+  font-weight: bold;
+  border: none;
+  background-color: transparent;
+  color: #6d6d6d;
+  width: 28px;
+  height: 28px;
+}
+
+#resetEQ:hover {
+  color: #ffffff;
+  cursor: pointer;
+}
+
+/* pitch container */
+#pitch_container {
+  display: flex;
+  margin-top: 15px;
+  gap: 15px;
+}
+
+#pitchInput {
+  text-align: center;
+  padding-top: 3px;
+  padding-bottom: 3px;
+  border-color: rgb(0, 107, 184);
+  background-color: black;
+  color: white;
+  border-style: solid;
+  border-radius: 5px;
+  outline: none;
+}
+
+#pitchInput::-webkit-inner-spin-button,
+#pitchInput::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+}
+
+/* Estilo del fondo del modal */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  overflow: auto;
+  background-color: rgba(0, 0, 0, 0.6);
+  height: 100vh;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Contenido del modal */
+.modal-content {
+  background-color: #121212;
+  padding: 30px;
+  border-radius: 10px;
+  width: 80%;
+  max-width: 650px;
+  position: relative;
+}
+
+/* Estilos del ecualizador */
+#eqContainer {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 20px 0;
+}
+
+.eqBand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 50px;
+}
+
+.eqLabel {
+  margin-bottom: 5px;
+  font-size: 12px;
 }

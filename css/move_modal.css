@@ -13,7 +13,8 @@
  .move-modal {
      width: 720px;
      max-height: 80vh;
-     background: #ffffff;
+     background: #1b1b1b;
+     color: rgb(255, 255, 255);
      border-radius: 10px;
      padding: 16px;
      box-sizing: border-box;
@@ -40,6 +41,7 @@
      border: none;
      font-size: 1.1rem;
      cursor: pointer;
+     color: white;
  }
 
  .move-modal .modal-topbar {
@@ -58,14 +60,14 @@
  .move-modal button.control {
      padding: 6px 10px;
      border-radius: 6px;
-     border: 1px solid #cccccc;
-     background: #f6f6f6;
+     border: 1px solid #141414;
+     background: #232323;
      cursor: pointer;
      font-weight: 600;
  }
 
  .move-modal .current-path {
-     color: #666;
+     color: #d2d2d2;
      font-size: 0.85rem;
      white-space: nowrap;
      overflow: hidden;
@@ -81,7 +83,7 @@
      border: 1px solid #eee;
      padding: 8px;
      border-radius: 6px;
-     background: #fafafa;
+     background: #181818;
  }
 
  #moveTreeContainer ul {
@@ -101,7 +103,7 @@
  }
 
  .folder-item:hover {
-     background: #f0f8ff;
+     background: #3d4042;
  }
 
  .folder-item .toggle {
@@ -122,7 +124,7 @@
  }
 
  .folder-item.selected {
-     background-color: #e0f0ff;
+     background-color: #232527;
      border-left: 3px solid #007bff;
  }
 
@@ -137,7 +139,8 @@
      padding: 8px 12px;
      border-radius: 6px;
      border: 1px solid #bbb;
-     background: #fff;
+     background: #0b0b0b;
+     color: white;
      cursor: pointer;
      font-weight: 600;
  }

@@ -12,23 +12,28 @@
 }
 
 .custom-prompt-content {
-  background: #fff;
+  background: #1e1e1e;
   padding: 20px;
   border-radius: 8px;
-  min-width: 100px;
-  max-width: 400px;   /* Máximo ancho relativo a la ventana */
+  min-width: 400px;
+  max-width: 500px;
+  /* Máximo ancho relativo a la ventana */
   outline: none;
   display: flex;
   flex-direction: column;
-  word-wrap: break-word; /* Fuerza el salto de línea si es necesario */
-  overflow: hidden; /* Evita scrollbars */
+  word-wrap: break-word;
+  /* Fuerza el salto de línea si es necesario */
+  overflow: hidden;
+  /* Evita scrollbars */
 }
 
 .custom-prompt-message {
   font-size: 16px;
   font-weight: bold;
-  word-break: break-word; /* Rompe palabras largas si es necesario */
-  white-space: normal;    /* Asegura que el texto se envuelva */
+  word-break: break-word;
+  /* Rompe palabras largas si es necesario */
+  white-space: normal;
+  /* Asegura que el texto se envuelva */
 }
 
 .custom-prompt-input {
@@ -36,6 +41,15 @@
   width: 100%;
   margin-top: 10px;
   z-index: 11001;
+  outline: none;
+  border: 2px solid rgb(0, 96, 241);
+  border-radius: 5px;
+  background-color: black;
+  color: white;
+  padding-left: 5px;
+  padding-right: 5px;
+  padding-top: 5px;
+  padding-bottom: 5px;
 }
 
 .custom-prompt-buttons {
@@ -46,4 +60,15 @@
 .custom-prompt-buttons button {
   margin-left: 10px;
   z-index: 11002;
+  color: white;
+  border-style: none;
+  padding: 5px 3px; /* TB LR */
+  width: 70px;
+  background: #286cda;
+  border-radius: 4px;
+}
+
+.custom-prompt-buttons button:hover {
+  background-color: #4a8cff; /* color más oscuro al pasar el mouse */
+  cursor: pointer;
 }

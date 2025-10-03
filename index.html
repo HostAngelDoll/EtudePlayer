@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="css/input_modal.css">
   <link rel="stylesheet" href="css/treeview.css">
   <link rel="stylesheet" href="css/font-awesome.min.css">
+  <link rel="stylesheet" href="css/videoCont.css">
   <script src="wavesurfer.min.js"></script>
   <script src="custom_modal.js"></script>
   <script src="alert.modal.js"></script>
@@ -20,24 +21,48 @@
 <body>
 
   <div id="progressTooltip">
-    <div id="progressMessage">Indexando...</div>
+    <div id="progressMessage">...</div>
     <div id="progressBar">
       <div id="progressFill"></div>
     </div>
   </div>
 
-  <div class="container">
+  <div class="container" id="main-program">
 
     <!-- ActivityBar lateral izquierda -->
     <div class="activitybar">
-      <div class="activitybar-item active" data-view="explorer">
-        <span class="icon icon-explorer"></span>
+      <div class="activitybar-item active" data-view="main_EtudePlayer" title="EtudePlayer">
+        <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="48" height="48" viewBox="0 0 48 48">
+          <path
+            d="M 24.4375 4.0019531 A 1.50015 1.50015 0 0 0 23 5.5 L 23 15.255859 A 1.50015 1.50015 0 0 0 23 15.736328 L 23 30.279297 C 22.973003 30.25816 22.949133 30.233735 22.921875 30.212891 C 21.091228 28.812983 18.65717 28 16 28 C 13.34283 28 10.908772 28.812983 9.078125 30.212891 C 7.2474778 31.612798 6 33.675029 6 36 C 6 38.324971 7.2474778 40.387202 9.078125 41.787109 C 10.908772 43.187017 13.34283 44 16 44 C 18.65717 44 21.091228 43.187017 22.921875 41.787109 C 24.684898 40.438915 25.894536 38.473774 25.982422 36.253906 A 1.50015 1.50015 0 0 0 25.984375 36.232422 A 1.50015 1.50015 0 0 0 26 36 L 26 17.664062 L 39.972656 22.904297 A 1.50015 1.50015 0 0 0 42 21.5 L 42 14.964844 C 42 12.260179 40.315757 9.8286138 37.783203 8.8789062 L 25.027344 4.0957031 A 1.50015 1.50015 0 0 0 24.4375 4.0019531 z M 26 7.6640625 L 36.728516 11.6875 C 38.099962 12.201792 39 13.499508 39 14.964844 L 39 19.335938 L 26 14.460938 L 26 7.6640625 z M 16 31 C 18.037254 31 19.853864 31.643074 21.099609 32.595703 C 22.345354 33.548333 23 34.735121 23 36 C 23 37.264879 22.345354 38.451667 21.099609 39.404297 C 19.853864 40.356926 18.037254 41 16 41 C 13.962746 41 12.146136 40.356926 10.900391 39.404297 C 9.6546451 38.451667 9 37.264879 9 36 C 9 34.735121 9.6546451 33.548333 10.900391 32.595703 C 12.146136 31.643074 13.962746 31 16 31 z">
+          </path>
+        </svg>
       </div>
-      <div class="activitybar-item" data-view="search">
-        <span class="icon icon-search"></span>
+      <div class="activitybar-item" data-view="main_HandEtude" title="HandEtude">
+        <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
+          <path
+            d="M0 0 C3.159 2.89 4.769 4.766 5.562 9 C3.983 17.422 -3.366 22.262 -10 27 C-10.66 27 -11.32 27 -12 27 C-11.508 27.786 -11.508 27.786 -11.006 28.589 C-9.519 30.973 -8.041 33.361 -6.562 35.75 C-5.788 36.987 -5.788 36.987 -4.998 38.25 C-4.505 39.049 -4.012 39.848 -3.504 40.672 C-3.048 41.405 -2.593 42.138 -2.123 42.894 C0.166 47.187 0.327 51.17 0 56 C-2.491 63.603 -7.476 67.705 -13.5 72.688 C-14.418 73.454 -15.336 74.221 -16.281 75.012 C-20.737 78.27 -24.316 79.303 -29.812 79.375 C-30.788 79.403 -31.764 79.432 -32.77 79.461 C-40.463 78.363 -45.268 74.341 -50 68.438 C-50.508 67.824 -51.015 67.211 -51.538 66.579 C-65.067 50.072 -65.067 50.072 -65.176 42.648 C-65.2 41.796 -65.223 40.944 -65.248 40.066 C-65.29 38.296 -65.322 36.525 -65.342 34.754 C-65.523 29.122 -66.527 24.987 -69.149 19.982 C-70.553 16.711 -70.058 14.306 -69 11 C-67.185 8.656 -65.847 8.129 -62.945 7.688 C-57.474 7.393 -54.217 8.273 -50 12 C-46.115 16.64 -44.984 21.177 -44 27 C-42.018 25.461 -40.039 23.92 -38.062 22.375 C-37.444 21.892 -36.826 21.409 -36.189 20.912 C-32.581 18.078 -29.017 15.2 -25.496 12.258 C-24.748 11.633 -23.999 11.009 -23.228 10.366 C-21.769 9.144 -20.314 7.917 -18.864 6.685 C-7.941 -2.455 -7.941 -2.455 0 0 Z M-12.875 11.812 C-14.031 12.825 -15.188 13.835 -16.348 14.844 C-16.946 15.366 -17.544 15.888 -18.161 16.426 C-22.795 20.392 -27.652 24.087 -32.479 27.813 C-33.828 28.866 -35.158 29.943 -36.484 31.023 C-37.17 31.573 -37.856 32.122 -38.562 32.688 C-39.121 33.145 -39.679 33.603 -40.254 34.074 C-42.631 35.335 -44.35 35.296 -47 35 C-49.473 32.527 -49.835 30.594 -50.812 27.25 C-52.482 22.086 -53.954 18.642 -58 15 C-59.32 15 -60.64 15 -62 15 C-61.795 15.501 -61.59 16.003 -61.379 16.52 C-58.928 23.403 -58.564 29.983 -58.467 37.222 C-58.248 45.829 -54.686 50.742 -49.125 57 C-48.086 58.187 -47.047 59.375 -46.008 60.562 C-45.504 61.134 -45 61.706 -44.48 62.295 C-43.04 63.954 -41.646 65.644 -40.258 67.348 C-37.79 70.247 -36.704 71.242 -33 72 C-25.915 72.562 -22.056 70.059 -16.625 65.875 C-16.018 65.414 -15.411 64.953 -14.785 64.478 C-10.726 61.17 -8.398 58.194 -7 53 C-7.941 45.999 -12.284 40.757 -16.275 35.141 C-16.766 34.421 -17.256 33.702 -17.762 32.961 C-18.442 31.999 -18.442 31.999 -19.135 31.017 C-20.321 28.251 -19.992 26.813 -19 24 C-17.418 22.302 -17.418 22.302 -15.402 20.809 C-14.684 20.256 -13.965 19.704 -13.225 19.135 C-12.47 18.575 -11.715 18.015 -10.938 17.438 C-9.438 16.323 -7.947 15.197 -6.465 14.059 C-5.801 13.567 -5.137 13.075 -4.453 12.568 C-2.547 10.867 -2.547 10.867 -3 7 C-7.886 7 -9.457 8.718 -12.875 11.812 Z "
+            fill="#000000" transform="translate(82,15)" />
+          <path
+            d="M0 0 C0.572 0.215 1.145 0.431 1.734 0.652 C2.064 2.302 2.394 3.952 2.734 5.652 C-1.451 8.842 -3.971 10.157 -9.266 9.652 C-9.596 8.002 -9.926 6.352 -10.266 4.652 C-9.026 3.783 -7.774 2.932 -6.516 2.09 C-5.82 1.614 -5.123 1.139 -4.406 0.648 C-2.266 -0.348 -2.266 -0.348 0 0 Z "
+            fill="#000000" transform="translate(58.265625,12.34765625)" />
+          <path
+            d="M0 0 C4.322 0.503 7.594 1.195 11 4 C11.375 6.625 11.375 6.625 11 9 C10.67 9.33 10.34 9.66 10 10 C2.083 9.253 2.083 9.253 -1 7 C-1.875 5.062 -1.875 5.062 -2 3 C-1.34 2.01 -0.68 1.02 0 0 Z "
+            fill="#000000" transform="translate(26,12)" />
+          <path
+            d="M0 0 C2.5 0.125 2.5 0.125 3.5 1.125 C3.599 2.956 3.63 4.791 3.625 6.625 C3.628 7.625 3.63 8.626 3.633 9.656 C3.5 12.125 3.5 12.125 2.5 13.125 C0 13.25 0 13.25 -2.5 13.125 C-3.5 12.125 -3.5 12.125 -3.633 9.656 C-3.63 8.656 -3.628 7.656 -3.625 6.625 C-3.628 5.625 -3.63 4.624 -3.633 3.594 C-3.453 0.249 -3.348 0.167 0 0 Z "
+            fill="#000000" transform="translate(42.5,3.875)" />
+        </svg>
       </div>
-      <div class="activitybar-item" data-view="settings">
-        <span class="icon icon-settings"></span>
+      <div class="activitybar-item" data-view="main_gallery_cures" title="Dependences">
+        <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" preserveAspectRatio="xMidYMid meet">
+          <path
+            d="M0 0 C1.769 -0.007 1.769 -0.007 3.575 -0.014 C6.066 -0.018 8.558 -0.009 11.049 0.012 C14.862 0.039 18.672 0.012 22.484 -0.02 C24.906 -0.016 27.328 -0.01 29.75 0 C31.46 -0.015 31.46 -0.015 33.204 -0.031 C41.087 0.086 41.087 0.086 45.094 3.024 C48.23 7.671 47.644 12.281 46.875 17.664 C44.127 23.848 38.752 27.681 32.836 30.707 C21.79 34.864 6.225 34.326 -4.633 30.004 C-9.948 27.147 -14.93 23.451 -17.125 17.664 C-17.496 14.824 -17.496 14.824 -17.562 11.727 C-17.602 10.707 -17.642 9.687 -17.684 8.637 C-15.908 -0.811 -7.776 -0.069 0 0 Z M-11.125 9.664 C-9.943 15.143 -8.723 18.119 -4.125 21.664 C6.219 27.121 16.657 27.74 27.875 24.664 C32.964 22.539 36.84 20.366 39.875 15.664 C40.862 12.661 40.862 12.661 40.875 9.664 C39.32 7.531 38.405 6.761 35.788 6.283 C34.987 6.281 34.185 6.278 33.359 6.276 C32.448 6.266 31.537 6.257 30.599 6.247 C29.127 6.256 29.127 6.256 27.625 6.266 C26.615 6.263 25.606 6.26 24.565 6.257 C22.43 6.255 20.295 6.26 18.16 6.273 C14.888 6.289 11.616 6.273 8.344 6.254 C6.271 6.256 4.198 6.26 2.125 6.266 C1.144 6.26 0.162 6.253 -0.849 6.247 C-2.215 6.261 -2.215 6.261 -3.609 6.276 C-4.812 6.279 -4.812 6.279 -6.038 6.283 C-8.601 6.751 -9.493 7.686 -11.125 9.664 Z "
+            fill="#000000" transform="translate(33.125,55.3359375)" />
+          <path
+            d="M0 0 C3.55 2.384 6.961 4.864 10.293 7.543 C10.867 7.993 11.44 8.444 12.031 8.907 C14.658 11.145 15.951 12.66 16.762 16.043 C15.778 20.15 13.49 22.033 10.293 24.543 C9.703 25.017 9.113 25.491 8.506 25.98 C-0.299 32.858 -8.212 37.17 -19.68 36.625 C-26.371 35.437 -30.208 32.091 -34.52 27.043 C-37.179 21.478 -36.84 14.999 -35.957 9.043 C-33.889 3.87 -30.341 -0.913 -25.188 -3.359 C-16.249 -5.755 -7.962 -4.524 0 0 Z M-27.957 9.043 C-29.836 12.8 -29.621 16.963 -28.957 21.043 C-26.957 24.477 -24.534 27.255 -20.957 29.043 C-12.591 30.336 -6.808 27.68 0.043 23.043 C2.512 21.139 4.76 19.174 7.043 17.043 C4.855 11.512 -0.142 9.138 -4.957 6.043 C-5.947 5.404 -6.937 4.764 -7.957 4.105 C-16.18 1.193 -22.283 2.345 -27.957 9.043 Z "
+            fill="#000000" transform="translate(61.95703125,11.95703125)" />
+        </svg>
       </div>
     </div>
 
@@ -49,26 +74,48 @@
 
       <div class="tabs-container">
         <div class="tab active" data-tab="tab1">
-          Playlist
+          <div class="icon-container-tab">
+            <img
+              src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAACXBIWXMAAAsTAAALEwEAmpwYAAABVElEQVR4nO3UwUoCQRzH8X2M7tHBLAODgvCgNq6ru+4adAgK1EMHtdCeICGxk/cOdspLdCjoDVz2NbrUpZCiJ/hG4K4u6zKQ26l+8DnNzv8//JkdRfnPb4b2nk67/MJZGZ+2ZUfT4MR85tRinuDHw77DsI/UTd87HXWTMMEGg67NdRepwcXI23NcIsQomhHVSniq1k4kRWfDkYFLkYVew+GyQahePXAzONBxyRt0qjadGqHOa4G5sl/EpfxGKBdwRV/c0FSMAi75hpbp0LLwM31zp1hcQtOu0LQnNI1Z8gZN06Zp4dMwp3deFNYR+TEizzw/HoUb0rlH0iphlEVDSn0lpRJGXqBiOFQNfCr69N3ZEu9s5wjxIW9wqNuzf+bEyFtPigc2BXMlxd1C4/kOidwaiewnG7v4JLJj4pllJYoQy8SJZ+5Zzb5N3BITK5EUV/5svgD7BsPzt0QAIQAAAABJRU5ErkJggg=="
+              alt="playlist">
+          </div>
+          <span class="label-tab">Playlist</span>
           <span class="tab-close">×</span>
         </div>
         <div class="tab" data-tab="tab2">
-          Video
+          <div class="icon-container-tab">
+            <img
+              src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAACXBIWXMAAAsTAAALEwEAmpwYAAACO0lEQVR4nO2YPU/bQBzGT90q5GOBEF5KAitSN5T7AAxFlSpVvLclEKdzDOrAyMcAU95pAjRk7efo1A9Aqu7tXMnIdhP74v+dz/4fFcM90m/y8nueW+5MiImJiYmJickTyGzHfj3Tqf+c6Xz0tHLXox5QHqDUtruldm0RXaB8V+/iJGHBPm0IO6DUtu/RBR5H0gYpfU1C0AViR11GSkKCEbWI2wgVR8upvLEc9ps22I/ERx0rJiRvxUzHudmWFhjamZ+jDfaNOszrkSwwKJljRaHkTSgpgwB5vssmLYe51Kn8jcuDBXSsmMp1nC3vRYy4y9inl0PDTmXPalT+DIqLC2hYMU2yTysJ8bNPnlkOq9IG+yUSFxbIt+I2LCiQDKlGNEOmmlVveIctWA77niYuLpB1xWsFwVYkKGdTSVpaIPeKSpKb3tQXORRdIOWoVVaUCU72uOrxgQNfQMOKaZIclzwUWyCTpIogIOkzcfme5yIEX0DDiqBgTBLmXQC6gI4V0yQnzkPGASi6AGpFXnI8jTOfDQ50AdWjlq3IS25IKfqcRuALZJU8yy5ZPF2HOVnHF8gjmRSUSw4yFrAWgL5K6FgxTTLgGIZgL3M6VpQJJvi8GlD4B/o6rWNFSDAuCXIUgn7QcIKPJFk4WhFCsE9KWDKroFhy1MeFWA4gio96KnrU61hRJshxmIRgU3BXu9gVZYI+I32WQg764H9sjbhLiwV3pQsL5pQ8UOJ+9PDtK3QBExMTExMTE/L/8wDYDa8NlVnYAQAAAABJRU5ErkJggg=="
+              alt="video-call">
+          </div>
+          <span class="label-tab">Video</span>
           <span class="tab-close">×</span>
         </div>
         <div class="tab" data-tab="tab3">
-          Settings
+          <div class="icon-container-tab">
+            <img
+              src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAACXBIWXMAAAsTAAALEwEAmpwYAAACY0lEQVR4nO1ZTU8UQRCdoAmcFG/AxcSAVWtCOABy5GgiAcVEfgrCeTnD4m/AyyIk/gIORJxqlhCWmyf0YNYQPbpyoUw1C2T5CD3TNR8bp5JKNtnZ7feqqnteVwVBYYUV5m3MQRfvDj1nwgUm/MiEdTbwmwlOrNvPWGfCdfuMPMtBV/bAa9jPBpeY4Dsb5EhO8M3+tob96QPfHn7EBlfZYDMy8OvetP+1P9KbDniDb9jgTwXgVxwa8t/JAa8G91pRVwaOV0oLK7KWLvitxz1sYDNx8OYiG5uypl7k5fRIDTyeZ+ITb03e9yeQRtmY20jAisaGzQa8sVk4ZcLZeOBrTx4ywY+4i0+8eNXmHvuhIcd2nOi/94meHgEUX40Gnp71scE/OSLQ5D0YiBL9Jd/6VSbAgsldmJ3plHwRIDhyEoBWKfpHK4kMMBOMuZTPYm4JhKX5uwmIns8rAYNVBwJwmFsChHWHEoJfOSZw7JKBkxwT+PsfEDCdX0KHnb2JSecYTcirqb3IEvHQ5UWmJCUScXKREkpiLgHwR87dPA05/XltlKffvrS+szamQaLsBF7rQiPAz0+gmbmpdC80Gt0IVQKElSCqcTj4wOdSL2UjwMW/fBj1IACN2H1T21aR1oZ//caN/CmHpdexwF+QkF5lZgRg2Qt85q3FqlKTl78Odqfa3CXYkDVVwLdnAlYS3RMkrURYVm+vtxEhnG0NI5QJQCN2HzQyif2RXtURE2EltRHTDUO+ciztJNrGYDmTId+NAtA8HWfCd60T68De7C7HrHLLO7DfhaV5UZW5GLMWVljQ+fYPzbicDniMwzoAAAAASUVORK5CYII="
+              alt="box-important--v1">
+          </div>
+          <span class="label-tab">Release</span>
           <span class="tab-close">×</span>
         </div>
       </div>
 
       <div class="tab-content active" id="tab1">
 
+        <div id="progressPlaylistHead">
+          <div id="progressPlaylistMessage">...</div>
+          <div id="progressBarPlaylist">
+            <div id="progressFillPlaylist"></div>
+          </div>
+        </div>
+
         <table id="playlist" class="playlist">
           <thead>
-            <tr>
-              <th>Nombre</th>
-              <th>Duración</th>
+            <tr id="rowHeader">
+              <th id="nameCol">Nombre</th>
+              <th id="durationCol">Duración</th>
             </tr>
           </thead>
           <tbody>
@@ -76,42 +123,45 @@
           </tbody>
         </table>
 
+
       </div>
 
       <div class="tab-content" id="tab2">
-        <div id="videoContainer" style="display:none; text-align:center; width: 100%; background-color: black;">
-          <video id="videoPlayer" controls playsinline style="width:100%; max-width:600px;"></video>
+        <div id="videoContainer">
+          <video id="videoPlayer" playsinline></video>
         </div>
-
       </div>
 
       <div class="tab-content" id="tab3">
-        <h2>Configuración</h2>
-        <p>Personaliza la aplicación según tus preferencias.</p>
-        <div style="margin-top: 20px;">
-          <h3>Opciones disponibles:</h3>
-          <div style="margin-top: 10px;">
-            <label>
-              <input type="checkbox" checked> Tema oscuro
-            </label>
-          </div>
-          <div style="margin-top: 10px;">
-            <label>
-              <input type="checkbox"> Mostrar números de línea
-            </label>
-          </div>
-          <div style="margin-top: 10px;">
-            <label>
-              <input type="checkbox" checked> Auto-guardado
-            </label>
-          </div>
+        <div style="margin: 15px;">
+          <h2>Usage warning (alpha-beta vertion)</h2>
+          <p>This version is not complete and is only there to finish a tedious task.</p>
           <div style="margin-top: 20px;">
-            <button
-              style="padding: 8px 16px; background-color: #0e639c; color: white; border: none; border-radius: 3px; cursor: pointer;">
-              Guardar configuración
-            </button>
+            <h3>Available options:</h3>
+            <div style="margin-top: 10px;">
+              <label>
+                <input type="checkbox" checked> EtudePlayer is enabled at the moment
+              </label>
+            </div>
+            <div style="margin-top: 10px;">
+              <label>
+                <input type="checkbox"> HandEtude is comming soon
+              </label>
+            </div>
+            <div style="margin-top: 10px;">
+              <label>
+                <input type="checkbox"> Dependences explorer is comming soon
+              </label>
+            </div>
+            <div style="margin-top: 20px;">
+              <button
+                style="padding: 8px 16px; background-color: #0e639c; color: white; border: none; border-radius: 3px; cursor: pointer;">
+                Accept version under construction
+              </button>
+            </div>
           </div>
         </div>
+
       </div>
 
     </div>
@@ -123,15 +173,17 @@
 
     <div class="statusbar-left">
 
-      <div class="statusbar-right">
-        <div class="statusbar-item toggle-playback" id="togglePlayback">
-          <i class="fa fa-play-circle" aria-hidden="true"></i>
-          Playback
-        </div>
+      <div class="statusbar-item toggle-playback" id="togglePlayback">
+        <i class="fa fa-play-circle" aria-hidden="true"></i>
+        <span id="playback_toogle_text"></span>
       </div>
 
-      <div class="statusbar-item" id="statusBar">
+      <div class="statusbar-item statusbar_mainEtudePlayer" id="statusBar">
         EtudePlayer
+      </div>
+
+      <div class="statusbar-right">
+
       </div>
 
     </div>
@@ -154,19 +206,9 @@
             <button class="playback-btn" id="prevBtn"><i class="fa fa-step-backward" aria-hidden="true"></i></button>
             <button class="playback-btn" id="nextBtn"><i class="fa fa-step-forward" aria-hidden="true"></i></button>
             <button class="playback-btn" id="openTrashBtn"><i class="fa fa-recycle" aria-hidden="true"></i></button>
-            <button class="playback-btn" id="openEqualizer">𖤐</button>
-            <button class="playback-btn" id="stopOnFinish">↩</button>
-
-            <div>
-              <label for="pitchSlider">Rate:</label>
-              <input type="range" id="pitchSlider" min="0.98" max="1.04" step="0.01" value="1.0">
-              <input type="number" id="pitchInput" min="0.98" max="1.04" step="0.01" value="1.0">
-            </div>
-
-            <label>
-              <input type="checkbox" id="stopAfterCheckbox">
-              Stop on finish
-            </label>
+            <button class="playback-btn" id="openEqualizerBtn"><i class="fa fa-bar-chart"
+                aria-hidden="true"></i></button>
+            <button class="playback-btn" id="stopOnFinishBtn">↩</button>
 
           </div>
 
@@ -192,106 +234,67 @@
   </div>
 
   <!-- Ecualizer Modal -->
-  <div id="controls" style="display: none;">
-    <button id="prevBtn">⏮️ Anterior</button>
-    <button id="playPauseBtn">▶️/⏸️</button>
-    <button id="nextBtn">⏭️ Siguiente</button>
-    <button id="stopBtn">⏹️ Stop</button>
-    <button id="openTrashBtn">Abrir papelera</button>
+  <div id="equalizadorModal" class="modal">
+    <div class="modal-content">
+      <div id="headEq">
+        <span id="titleModal">Ecualizador</span>
+        <button id="closeEqBtn" title="Cerrar Ecualizador">&times;</button>
+      </div>
 
-    <br>
+      <div id="eqContainer">
+        <div class="eqBand">
+          <div class="eqLabel">32 Hz</div>
+          <input type="range" min="-40" max="40" step="0.1">
+        </div>
+        <div class="eqBand">
+          <div class="eqLabel">64 Hz</div>
+          <input type="range" min="-40" max="40" step="0.1">
+        </div>
+        <div class="eqBand">
+          <div class="eqLabel">125 Hz</div>
+          <input type="range" min="-40" max="40" step="0.1">
+        </div>
+        <div class="eqBand">
+          <div class="eqLabel">250 Hz</div>
+          <input type="range" min="-40" max="40" step="0.1">
+        </div>
+        <div class="eqBand">
+          <div class="eqLabel">500 Hz</div>
+          <input type="range" min="-40" max="40" step="0.1">
+        </div>
+        <div class="eqBand">
+          <div class="eqLabel">1k Hz</div>
+          <input type="range" min="-40" max="40" step="0.1">
+        </div>
+        <div class="eqBand">
+          <div class="eqLabel">2k Hz</div>
+          <input type="range" min="-40" max="40" step="0.1">
+        </div>
+        <div class="eqBand">
+          <div class="eqLabel">4k Hz</div>
+          <input type="range" min="-40" max="40" step="0.1">
+        </div>
+        <div class="eqBand">
+          <div class="eqLabel">8k Hz</div>
+          <input type="range" min="-40" max="40" step="0.1">
+        </div>
+        <div class="eqBand">
+          <div class="eqLabel">16k Hz</div>
+          <input type="range" min="-40" max="40" step="0.1">
+        </div>
+      </div>
 
-    <label>
-      <input type="checkbox" id="stopAfterCheckbox">
-      Stop after current song
-    </label>
-    <br>
-    <div id="volumeControl">
-      <input type="range" id="volumeSlider" min="0" max="100" value="10">
-      <span id="volumeLabel">10%</span>
+      <div id="playrateHead">
+        <span id="titleSec1">Playback Rate</span>
+        <button id="resetEQ" title="Reset to default">⤾</button>
+      </div>
+
+      <div id="pitch_container">
+        <input type="range" id="pitchSlider" min="0.98" max="1.04" step="0.01" value="1.0">
+        <input type="number" id="pitchInput" min="0.98" max="1.04" step="0.01" value="1.0">
+      </div>
+
     </div>
-    <br>
-    <button id="btnMute">Mute</button>
-    <button id="btnVolDown">V-</button>
-    <button id="btnVolUp">V+</button>
-    <br>
-
-    <div id="videoContainer" style="display:none; text-align:center;">
-      <video id="videoPlayer" controls playsinline style="width:100%; max-width:600px;"></video>
-    </div>
-
-    <br>
-
-    <div id="waveform"></div>
-
-    <br>
-
-    <div id="durations">
-      <span>Total: <span id="totalDur">0:00</span></span> |
-      <span>Current: <span id="currentDur">0:00</span></span> |
-      <span>Left: <span id="leftDur">0:00</span></span>
-    </div>
-
-    <br>
-
-    <div>
-      <label for="pitchSlider">Pitch/Speed:</label>
-      <input type="range" id="pitchSlider" min="0.5" max="2.0" step="0.01" value="1.0">
-      <input type="number" id="pitchInput" min="0.5" max="2.0" step="0.01" value="1.0">
-    </div>
-
-    <br>
-
-    <div id="statusBar">EtudePlayer</div>
-
-    <br>
-
-    <h2>Ecualizador</h2>
-    <div id="eqContainer">
-      <div class="eqBand">
-        <div class="eqLabel">32 Hz</div>
-        <input type="range" min="-40" max="40" step="0.1">
-      </div>
-      <div class="eqBand">
-        <div class="eqLabel">64 Hz</div>
-        <input type="range" min="-40" max="40" step="0.1">
-      </div>
-      <div class="eqBand">
-        <div class="eqLabel">125 Hz</div>
-        <input type="range" min="-40" max="40" step="0.1">
-      </div>
-      <div class="eqBand">
-        <div class="eqLabel">250 Hz</div>
-        <input type="range" min="-40" max="40" step="0.1">
-      </div>
-      <div class="eqBand">
-        <div class="eqLabel">500 Hz</div>
-        <input type="range" min="-40" max="40" step="0.1">
-      </div>
-      <div class="eqBand">
-        <div class="eqLabel">1k Hz</div>
-        <input type="range" min="-40" max="40" step="0.1">
-      </div>
-      <div class="eqBand">
-        <div class="eqLabel">2k Hz</div>
-        <input type="range" min="-40" max="40" step="0.1">
-      </div>
-      <div class="eqBand">
-        <div class="eqLabel">4k Hz</div>
-        <input type="range" min="-40" max="40" step="0.1">
-      </div>
-      <div class="eqBand">
-        <div class="eqLabel">8k Hz</div>
-        <input type="range" min="-40" max="40" step="0.1">
-      </div>
-      <div class="eqBand">
-        <div class="eqLabel">16k Hz</div>
-        <input type="range" min="-40" max="40" step="0.1">
-      </div>
-    </div>
-    <br>
-    <button id="resetEQ">Restablecer EQ</button>
-
   </div>
 
   <!-- MOVE-TO-FOLDER MODAL -->

@@ -65,6 +65,7 @@ function customPrompt(message, defaultValue = "", isSecondary = false) {
     input.value = defaultValue;
     input.id = "inputNewString";
     input.className = "custom-prompt-input";
+    input.spellcheck = false;
     input.setAttribute("aria-labelledby", "prompt-message");
     input.tabIndex = 0;
 

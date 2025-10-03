@@ -1,19 +1,25 @@
 // Toggle para mostrar/ocultar el playbackbar
 document.getElementById('togglePlayback').addEventListener('click', function () {
     const playbackBar = document.getElementById('playbackBar');
+    const mainContent = document.getElementById('main-program');
     playbackBar.classList.toggle('active');
+
+    // Ajustar la altura del contenido principal
+    const playbackHeight = playbackBar.classList.contains('active') ? playbackBar.offsetHeight : 0;
+    mainContent.style.paddingBottom = playbackHeight.toString() + 'px';
 
     // Cambiar el icono según el estado
     // const icon = this.querySelector('.icon');
     if (playbackBar.classList.contains('active')) {
         // icon.classList.remove('icon-play');
         // icon.classList.add('icon-play');
-        this.innerHTML = '<i class="fa fa-play-circle" aria-hidden="true"></i> Playback';
+        this.innerHTML = '<i class="fa fa-play-circle" aria-hidden="true"></i>';
     } else {
         // icon.classList.remove('icon-pause');
         // icon.classList.add('icon-play');
-        this.innerHTML = '<i class="fa fa-play-circle" aria-hidden="true"></i> Playback';
+        this.innerHTML = '<i class="fa fa-play-circle" aria-hidden="true"></i>';
     }
+
 });
 
 
@@ -62,21 +68,21 @@ tabs.forEach(tab => {
         e.stopPropagation(); // Evitar que el click también active la pestaña
 
         // Si la pestaña está activa, activar otra antes de cerrarla
-        if (tab.classList.contains('active')) {
-            const allTabs = Array.from(tabs);
-            const currentIndex = allTabs.indexOf(tab);
-            const nextTab = allTabs[currentIndex + 1] || allTabs[currentIndex - 1];
+        // if (tab.classList.contains('active')) {
+        //     const allTabs = Array.from(tabs);
+        //     const currentIndex = allTabs.indexOf(tab);
+        //     const nextTab = allTabs[currentIndex + 1] || allTabs[currentIndex - 1];
 
-            if (nextTab) {
-                nextTab.click();
-            }
-        }
+        //     if (nextTab) {
+        //         nextTab.click();
+        //     }
+        // }
 
-        // Eliminar la pestaña y su contenido
-        tab.remove();
-        const tabContent = document.getElementById(tab.getAttribute('data-tab'));
-        if (tabContent) {
-            tabContent.remove();
-        }
+        // // Eliminar la pestaña y su contenido
+        // tab.remove();
+        // const tabContent = document.getElementById(tab.getAttribute('data-tab'));
+        // if (tabContent) {
+        //     tabContent.remove();
+        // }
     });
 });
