@@ -22,6 +22,7 @@ const SAMPLE_RATE = 44100; // PCM sample rate we'll request from ffmpeg
 let win;
 
 async function createWindow() { // main function to start app
+  console.log("Ruta del cache:", CACHE_PATH);
   win = new BrowserWindow({
     width: 1200,
     height: 720,
